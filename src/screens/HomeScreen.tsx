@@ -103,6 +103,7 @@ export default function HomeScreen({ onDataChange, profileData, profile, onProfi
         data={data.habits}
         keyExtractor={item => item.id}
         renderItem={renderItem}
+        extraData={data}
         ListHeaderComponent={
           <XPHeader
             totalXP={data.totalXP}

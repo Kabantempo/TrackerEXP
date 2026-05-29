@@ -78,8 +78,8 @@ export default function HabitCard({ habit, entry, data, onYes, onNo, onEdit, onD
     onNo();
   }
 
-  const cardBg = status === 'yes' ? '#F9FAFB' : '#FFFFFF';
-  const borderColor = status === 'yes' ? '#D1D5DB' : '#E5E7EB';
+  const cardBg = '#FFFFFF';
+  const borderColor = status === 'yes' ? '#9CA3AF' : status === 'no' ? '#D1D5DB' : '#E5E7EB';
 
   return (
     <View style={styles.wrapper}>
