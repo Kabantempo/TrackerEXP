@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Animated, Image } from 'react-native';
+import { View, Text, StyleSheet, Animated } from 'react-native';
 import { getXPProgress } from '../types';
 
 interface Props {
@@ -26,12 +26,9 @@ export default function XPHeader({ totalXP, completedToday, totalHabits }: Props
   return (
     <View style={styles.container}>
       <View style={styles.topRow}>
-        <View style={styles.logoBlock}>
-          <Image source={require('../../assets/icon.png')} style={styles.logo} />
-          <View>
-            <Text style={styles.appTitle}>KABAN</Text>
-            <Text style={styles.dateText}>{dateStr}</Text>
-          </View>
+        <View>
+          <Text style={styles.appTitle}>KABAN</Text>
+          <Text style={styles.dateText}>{dateStr}</Text>
         </View>
         <View style={styles.levelBadge}>
           <Text style={styles.levelLabel}>NIV</Text>
@@ -84,16 +81,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 24,
-  },
-  logoBlock: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  logo: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
   },
   appTitle: {
     fontSize: 22,
