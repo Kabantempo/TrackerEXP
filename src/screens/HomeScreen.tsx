@@ -15,7 +15,7 @@ interface Props {
 }
 
 export default function HomeScreen({ onDataChange }: Props) {
-  const [data, setData] = useState<AppData>({ habits: [], entries: [], totalXP: 0 });
+  const [data, setData] = useState<AppData>({ habits: [], entries: [], totalXP: 0, earnedBadges: [] });
   const [modalVisible, setModalVisible] = useState(false);
   const [editingHabit, setEditingHabit] = useState<Habit | undefined>();
   const [loaded, setLoaded] = useState(false);

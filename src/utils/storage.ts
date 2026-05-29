@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { AppData, Habit, DailyEntry, getTodayKey, isChallengeActive } from '../types';
+import { AppData, Habit, DailyEntry, getTodayKey, isChallengeActive, checkBadges } from '../types';
+import { supabase, getDeviceId } from './supabase';
 
 const STORAGE_KEY = 'xp_tracker_data_v2';
 
@@ -44,13 +45,46 @@ const DEFAULT_DATA: AppData = {
   ],
   entries: [],
   totalXP: 0,
+  earnedBadges: [],
 };
 
+async function loadFromSupabase(): Promise<AppData | null> {
+  try {
+    const deviceId = await getDeviceId();
+    const { data, error } = await supabase
+      .from('kaban_data')
+      .select('data')
+      .eq('device_id', deviceId)
+      .single();
+    if (error || !data) return null;
+    const parsed = data.data as AppData;
+    if (!parsed.earnedBadges) parsed.earnedBadges = [];
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+async function syncToSupabase(appData: AppData): Promise<void> {
+  const deviceId = await getDeviceId();
+  await supabase.from('kaban_data').upsert(
+    { device_id: deviceId, data: appData, updated_at: new Date().toISOString() },
+    { onConflict: 'device_id' }
+  );
+}
+
 export async function loadData(): Promise<AppData> {
+  const remoteData = await loadFromSupabase();
+  if (remoteData) {
+    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(remoteData));
+    return remoteData;
+  }
   try {
     const raw = await AsyncStorage.getItem(STORAGE_KEY);
     if (!raw) return DEFAULT_DATA;
-    return JSON.parse(raw) as AppData;
+    const parsed = JSON.parse(raw) as AppData;
+    if (!parsed.earnedBadges) parsed.earnedBadges = [];
+    return parsed;
   } catch {
     return DEFAULT_DATA;
   }
@@ -58,6 +92,7 @@ export async function loadData(): Promise<AppData> {
 
 export async function saveData(data: AppData): Promise<void> {
   await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  syncToSupabase(data).catch(() => {});
 }
 
 export function getEntryForHabit(data: AppData, habitId: string, date?: string): DailyEntry | undefined {

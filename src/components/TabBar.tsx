@@ -2,25 +2,32 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
+export type TabName = 'home' | 'calendar' | 'badges';
+
 interface Props {
-  active: 'home' | 'calendar';
-  onChange: (tab: 'home' | 'calendar') => void;
+  active: TabName;
+  onChange: (tab: TabName) => void;
 }
+
+const TABS: { id: TabName; icon: string; label: string }[] = [
+  { id: 'home',     icon: '🏠', label: 'Habitudes' },
+  { id: 'calendar', icon: '📅', label: 'Calendrier' },
+  { id: 'badges',   icon: '🏅', label: 'Badges' },
+];
 
 export default function TabBar({ active, onChange }: Props) {
   return (
     <View style={styles.wrapper}>
       <LinearGradient colors={['#0D1B4B', '#1A0533']} style={styles.bar}>
-        <TouchableOpacity style={styles.tab} onPress={() => onChange('home')}>
-          <Text style={styles.icon}>🏠</Text>
-          <Text style={[styles.label, active === 'home' && styles.labelActive]}>Habitudes</Text>
-          {active === 'home' && <View style={styles.dot} />}
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.tab} onPress={() => onChange('calendar')}>
-          <Text style={styles.icon}>📅</Text>
-          <Text style={[styles.label, active === 'calendar' && styles.labelActive]}>Calendrier</Text>
-          {active === 'calendar' && <View style={styles.dot} />}
-        </TouchableOpacity>
+        {TABS.map(tab => (
+          <TouchableOpacity key={tab.id} style={styles.tab} onPress={() => onChange(tab.id)}>
+            <Text style={styles.icon}>{tab.icon}</Text>
+            <Text style={[styles.label, active === tab.id && styles.labelActive]}>
+              {tab.label}
+            </Text>
+            {active === tab.id && <View style={styles.dot} />}
+          </TouchableOpacity>
+        ))}
       </LinearGradient>
     </View>
   );
