@@ -93,11 +93,12 @@ export function setActiveData(all: AllProfiles, data: AppData): AllProfiles {
 export function createProfile(all: AllProfiles, name: string, emoji: string): AllProfiles {
   const id = `profile_${Date.now()}`;
   const profile: Profile = { id, name, emoji, createdAt: getTodayKey() };
+  const emptyData: AppData = { habits: [], entries: [], totalXP: 0, earnedBadges: [] };
   return {
     ...all,
     profiles: [...all.profiles, profile],
     activeId: id,
-    data: { ...all.data, [id]: makeDefaultAppData() },
+    data: { ...all.data, [id]: emptyData },
   };
 }
 
