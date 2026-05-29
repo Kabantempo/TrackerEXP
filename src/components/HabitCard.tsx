@@ -1,14 +1,11 @@
 import React, { useRef, useState } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity, Animated,
-  PanResponder, Dimensions,
+  View, Text, StyleSheet, TouchableOpacity, Animated, PanResponder,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Habit, DailyEntry, getChallengeProgress, AppData } from '../types';
 
 const SWIPE_THRESHOLD = 60;
-const ACTION_WIDTH = 130;
-const { width } = Dimensions.get('window');
+const ACTION_WIDTH = 120;
 
 interface Props {
   habit: Habit;
@@ -35,14 +32,11 @@ export default function HabitCard({ habit, entry, data, onYes, onNo, onEdit, onD
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > 8 && Math.abs(g.dy) < 20,
       onPanResponderMove: (_, g) => {
-        if (g.dx < 0) {
-          translateX.setValue(Math.max(g.dx, -ACTION_WIDTH));
-        } else if (swiped) {
-          translateX.setValue(Math.min(g.dx - ACTION_WIDTH, 0));
-        }
+        if (g.dx < 0) translateX.setValue(Math.max(g.dx, -ACTION_WIDTH));
+        else if (swiped) translateX.setValue(Math.min(g.dx - ACTION_WIDTH, 0));
       },
       onPanResponderRelease: (_, g) => {
-        if (g.dx < -SWIPE_THRESHOLD || swiped && g.dx < 0) {
+        if (g.dx < -SWIPE_THRESHOLD || (swiped && g.dx < 0)) {
           Animated.spring(translateX, { toValue: -ACTION_WIDTH, useNativeDriver: true, tension: 60 }).start();
           setSwiped(true);
         } else {
@@ -84,29 +78,19 @@ export default function HabitCard({ habit, entry, data, onYes, onNo, onEdit, onD
     onNo();
   }
 
-  const cardBg = status === 'yes'
-    ? 'rgba(5,150,105,0.12)'
-    : status === 'no'
-    ? 'rgba(220,38,38,0.08)'
-    : 'rgba(255,255,255,0.04)';
-
-  const borderColor = status === 'yes'
-    ? 'rgba(5,150,105,0.4)'
-    : status === 'no'
-    ? 'rgba(220,38,38,0.25)'
-    : 'rgba(255,255,255,0.07)';
+  const cardBg = status === 'yes' ? '#F9FAFB' : '#FFFFFF';
+  const borderColor = status === 'yes' ? '#D1D5DB' : '#E5E7EB';
 
   return (
     <View style={styles.wrapper}>
-      {/* Actions derrière */}
       <View style={styles.actionsBack}>
         <TouchableOpacity style={styles.editAction} onPress={() => { closeSwipe(); onEdit(); }}>
-          <Text style={styles.actionEmoji}>✏️</Text>
-          <Text style={styles.actionText}>Modifier</Text>
+          <Text style={styles.editIcon}>✏️</Text>
+          <Text style={styles.editText}>Modifier</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.deleteAction} onPress={() => { closeSwipe(); onDelete(); }}>
-          <Text style={styles.actionEmoji}>🗑️</Text>
-          <Text style={styles.actionText}>Supprimer</Text>
+          <Text style={styles.deleteIcon}>🗑️</Text>
+          <Text style={styles.deleteText}>Supprimer</Text>
         </TouchableOpacity>
       </View>
 
@@ -115,56 +99,47 @@ export default function HabitCard({ habit, entry, data, onYes, onNo, onEdit, onD
         {...panResponder.panHandlers}
       >
         <View style={[styles.inner, { backgroundColor: cardBg, borderColor }]}>
-          <View style={[styles.colorBar, { backgroundColor: habit.color }]} />
-
+          <View style={styles.colorBar} />
           <View style={styles.body}>
-            {/* Header */}
             <View style={styles.topRow}>
-              <View style={[styles.iconBg, { backgroundColor: habit.color + '22' }]}>
+              <View style={styles.iconBg}>
                 <Text style={styles.icon}>{habit.icon}</Text>
               </View>
               <View style={styles.textBlock}>
                 <View style={styles.nameRow}>
                   <Text style={styles.name}>{habit.name}</Text>
                   {isChallenge && (
-                    <View style={[styles.challengeBadge, { backgroundColor: habit.color + '33' }]}>
-                      <Text style={[styles.challengeText, { color: habit.color }]}>DÉFI</Text>
+                    <View style={styles.challengeBadge}>
+                      <Text style={styles.challengeText}>DÉFI</Text>
                     </View>
                   )}
                 </View>
                 {habit.description ? <Text style={styles.desc}>{habit.description}</Text> : null}
                 {isChallenge && habit.endDate && (
-                  <Text style={styles.deadline}>📅 Jusqu'au {habit.endDate}</Text>
+                  <Text style={styles.deadline}>Jusqu'au {habit.endDate}</Text>
                 )}
               </View>
             </View>
 
-            {/* Challenge progress bar */}
             {isChallenge && progress && (
               <View style={styles.challengeProgress}>
                 <View style={styles.progressBg}>
-                  <Animated.View
-                    style={[
-                      styles.progressFill,
-                      { width: `${Math.round(progress.percent * 100)}%`, backgroundColor: habit.color },
-                    ]}
-                  />
+                  <View style={[styles.progressFill, { width: `${Math.round(progress.percent * 100)}%` as any }]} />
                 </View>
                 <Text style={styles.progressText}>{progress.done}/{progress.total} jours</Text>
               </View>
             )}
 
-            {/* Bottom row */}
             <View style={styles.bottomRow}>
-              <View style={[styles.xpBadge, { borderColor: habit.color + '44' }]}>
-                <Text style={[styles.xpText, { color: habit.color }]}>+{habit.xpReward} XP</Text>
+              <View style={styles.xpBadge}>
+                <Text style={styles.xpText}>+{habit.xpReward} XP</Text>
               </View>
               <View style={styles.buttons}>
                 <TouchableOpacity
                   style={[styles.btn, status === 'no' && styles.btnNoActive]}
                   onPress={handleNo}
                 >
-                  <Text style={[styles.btnTxt, { color: status === 'no' ? '#EF4444' : '#475569' }]}>
+                  <Text style={[styles.btnTxt, status === 'no' && styles.btnNoTxt]}>
                     {status === 'no' ? '✗ Raté' : '✗'}
                   </Text>
                 </TouchableOpacity>
@@ -172,7 +147,7 @@ export default function HabitCard({ habit, entry, data, onYes, onNo, onEdit, onD
                   style={[styles.btn, status === 'yes' && styles.btnYesActive]}
                   onPress={handleYes}
                 >
-                  <Text style={[styles.btnTxt, { color: status === 'yes' ? '#10B981' : '#475569' }]}>
+                  <Text style={[styles.btnTxt, status === 'yes' && styles.btnYesTxt]}>
                     {status === 'yes' ? '✓ Fait !' : '✓'}
                   </Text>
                 </TouchableOpacity>
@@ -182,7 +157,6 @@ export default function HabitCard({ habit, entry, data, onYes, onNo, onEdit, onD
         </View>
       </Animated.View>
 
-      {/* XP popup */}
       <Animated.Text style={[styles.xpPopup, { transform: [{ translateY: xpAnim }], opacity: xpOpacity }]}>
         +{habit.xpReward} XP
       </Animated.Text>
@@ -194,66 +168,67 @@ const styles = StyleSheet.create({
   wrapper: { marginHorizontal: 16, marginVertical: 5 },
   actionsBack: {
     position: 'absolute', right: 0, top: 0, bottom: 0,
-    width: ACTION_WIDTH, flexDirection: 'row', borderRadius: 18, overflow: 'hidden',
+    width: ACTION_WIDTH, flexDirection: 'row', borderRadius: 16, overflow: 'hidden',
   },
   editAction: {
-    flex: 1, backgroundColor: '#1E3A5F', alignItems: 'center', justifyContent: 'center',
+    flex: 1, backgroundColor: '#F3F4F6', alignItems: 'center', justifyContent: 'center',
   },
+  editIcon: { fontSize: 16, marginBottom: 2 },
+  editText: { fontSize: 10, color: '#6B7280', fontWeight: '600' },
   deleteAction: {
-    flex: 1, backgroundColor: '#3B0A0A', alignItems: 'center', justifyContent: 'center',
-    borderTopRightRadius: 18, borderBottomRightRadius: 18,
+    flex: 1, backgroundColor: '#F9FAFB', alignItems: 'center', justifyContent: 'center',
+    borderTopRightRadius: 16, borderBottomRightRadius: 16,
   },
-  actionEmoji: { fontSize: 20, marginBottom: 2 },
-  actionText: { fontSize: 10, color: '#94A3B8', fontWeight: '600' },
-  card: { borderRadius: 18, overflow: 'hidden' },
+  deleteIcon: { fontSize: 16, marginBottom: 2 },
+  deleteText: { fontSize: 10, color: '#374151', fontWeight: '600' },
+  card: { borderRadius: 16, overflow: 'hidden' },
   inner: {
-    flexDirection: 'row', borderRadius: 18,
-    borderWidth: 1, overflow: 'hidden',
+    flexDirection: 'row', borderRadius: 16, borderWidth: 1, overflow: 'hidden',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06, shadowRadius: 4, elevation: 2,
   },
-  colorBar: { width: 4 },
+  colorBar: { width: 3, backgroundColor: '#111827' },
   body: { flex: 1, padding: 14 },
   topRow: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 10 },
   iconBg: {
-    width: 44, height: 44, borderRadius: 14,
+    width: 42, height: 42, borderRadius: 12, backgroundColor: '#F3F4F6',
     alignItems: 'center', justifyContent: 'center', marginRight: 12,
   },
-  icon: { fontSize: 22 },
+  icon: { fontSize: 20 },
   textBlock: { flex: 1 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
-  name: { fontSize: 15, fontWeight: '700', color: '#F1F5F9', letterSpacing: 0.2 },
+  name: { fontSize: 15, fontWeight: '700', color: '#111827' },
   challengeBadge: {
-    paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6,
+    backgroundColor: '#F3F4F6', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6,
   },
-  challengeText: { fontSize: 9, fontWeight: '800', letterSpacing: 1 },
-  desc: { fontSize: 12, color: '#64748B', marginTop: 2 },
-  deadline: { fontSize: 11, color: '#94A3B8', marginTop: 3 },
+  challengeText: { fontSize: 9, fontWeight: '800', color: '#6B7280', letterSpacing: 1 },
+  desc: { fontSize: 12, color: '#9CA3AF', marginTop: 2 },
+  deadline: { fontSize: 11, color: '#9CA3AF', marginTop: 3 },
   challengeProgress: { marginBottom: 10 },
   progressBg: {
-    height: 5, backgroundColor: 'rgba(255,255,255,0.08)',
-    borderRadius: 3, overflow: 'hidden', marginBottom: 4,
+    height: 4, backgroundColor: '#F3F4F6', borderRadius: 2, overflow: 'hidden', marginBottom: 4,
   },
-  progressFill: { height: '100%', borderRadius: 3 },
-  progressText: { fontSize: 10, color: '#64748B' },
-  bottomRow: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-  },
+  progressFill: { height: '100%', borderRadius: 2, backgroundColor: '#111827' },
+  progressText: { fontSize: 10, color: '#9CA3AF' },
+  bottomRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   xpBadge: {
-    borderWidth: 1, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8,
+    borderWidth: 1, borderColor: '#E5E7EB', paddingHorizontal: 9, paddingVertical: 3, borderRadius: 8,
   },
-  xpText: { fontSize: 12, fontWeight: '800', letterSpacing: 0.5 },
-  buttons: { flexDirection: 'row', gap: 8 },
+  xpText: { fontSize: 12, fontWeight: '800', color: '#374151' },
+  buttons: { flexDirection: 'row', gap: 6 },
   btn: {
-    paddingHorizontal: 16, paddingVertical: 7, borderRadius: 10,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
-    backgroundColor: 'rgba(255,255,255,0.04)', minWidth: 52, alignItems: 'center',
+    paddingHorizontal: 14, paddingVertical: 6, borderRadius: 8,
+    borderWidth: 1, borderColor: '#E5E7EB', backgroundColor: '#F9FAFB',
+    minWidth: 48, alignItems: 'center',
   },
-  btnNoActive: { borderColor: 'rgba(220,38,38,0.5)', backgroundColor: 'rgba(220,38,38,0.15)' },
-  btnYesActive: { borderColor: 'rgba(5,150,105,0.5)', backgroundColor: 'rgba(5,150,105,0.15)' },
-  btnTxt: { fontWeight: '700', fontSize: 13 },
+  btnNoActive: { borderColor: '#D1D5DB', backgroundColor: '#F3F4F6' },
+  btnYesActive: { borderColor: '#111827', backgroundColor: '#111827' },
+  btnTxt: { fontWeight: '700', fontSize: 13, color: '#9CA3AF' },
+  btnNoTxt: { color: '#374151' },
+  btnYesTxt: { color: '#FFFFFF' },
   xpPopup: {
     position: 'absolute', right: 20, top: 10,
-    color: '#A855F7', fontWeight: '900', fontSize: 18,
-    textShadowColor: '#A855F7', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 10,
+    color: '#111827', fontWeight: '900', fontSize: 18,
     pointerEvents: 'none',
   },
 });

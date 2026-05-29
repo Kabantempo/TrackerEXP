@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "xp-tracker",
-    "slug": "xp-tracker",
+    "name": "Kaban",
+    "slug": "kaban",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -17,7 +17,7 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.anonymous.xptracker"
+      "package": "com.kabantempo.kaban"
     },
     "web": {
       "favicon": "./assets/favicon.png"

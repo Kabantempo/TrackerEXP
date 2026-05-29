@@ -3,7 +3,6 @@ import {
   View, StyleSheet, FlatList, TouchableOpacity, Text,
   Alert, StatusBar, SafeAreaView,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import XPHeader from '../components/XPHeader';
 import HabitCard from '../components/HabitCard';
 import HabitModal from '../components/HabitModal';
@@ -128,6 +127,7 @@ export default function HomeScreen({ onDataChange }: Props) {
             <Text style={styles.emptyIcon}>🎯</Text>
             <Text style={styles.emptyTitle}>Aucune habitude</Text>
             <Text style={styles.emptyDesc}>Ajoute ta première habitude pour commencer à gagner de l'XP !</Text>
+
           </View>
         }
         ListFooterComponent={<View style={{ height: 160 }} />}
@@ -136,16 +136,9 @@ export default function HomeScreen({ onDataChange }: Props) {
       />
 
       <View style={styles.fabWrapper}>
-        <TouchableOpacity onPress={openAddModal} activeOpacity={0.85}>
-          <LinearGradient
-            colors={['#A855F7', '#6366F1']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.fab}
-          >
+        <TouchableOpacity onPress={openAddModal} activeOpacity={0.85} style={styles.fab}>
             <Text style={styles.fabIcon}>+</Text>
             <Text style={styles.fabText}>Ajouter</Text>
-          </LinearGradient>
         </TouchableOpacity>
       </View>
 
@@ -165,7 +158,7 @@ export default function HomeScreen({ onDataChange }: Props) {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#080B1A',
+    backgroundColor: '#F9FAFB',
   },
   list: {
     paddingTop: 0,
@@ -182,12 +175,12 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 20,
     fontWeight: '800',
-    color: '#E2E8F0',
+    color: '#111827',
     marginBottom: 8,
   },
   emptyDesc: {
     fontSize: 14,
-    color: '#475569',
+    color: '#9CA3AF',
     textAlign: 'center',
     lineHeight: 20,
   },
@@ -205,11 +198,12 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderRadius: 32,
     gap: 8,
-    shadowColor: '#A855F7',
+    backgroundColor: '#111827',
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.5,
+    shadowOpacity: 0.2,
     shadowRadius: 12,
-    elevation: 10,
+    elevation: 8,
   },
   fabIcon: {
     color: '#FFFFFF',

@@ -2,20 +2,26 @@ import React from 'react';
 import {
   View, Text, FlatList, StyleSheet, SafeAreaView, StatusBar,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { AppData, BADGES, BadgeDef } from '../types';
 
-const RARITY_COLORS: Record<BadgeDef['rarity'], string[]> = {
-  common:    ['#374151', '#1F2937'],
-  rare:      ['#1E40AF', '#1E3A8A'],
-  epic:      ['#6D28D9', '#4C1D95'],
-  legendary: ['#B45309', '#78350F'],
+const RARITY_COLORS: Record<BadgeDef['rarity'], string> = {
+  common:    '#F9FAFB',
+  rare:      '#EFF6FF',
+  epic:      '#F5F3FF',
+  legendary: '#FFFBEB',
+};
+
+const RARITY_BORDER: Record<BadgeDef['rarity'], string> = {
+  common:    '#E5E7EB',
+  rare:      '#BFDBFE',
+  epic:      '#DDD6FE',
+  legendary: '#FDE68A',
 };
 
 const RARITY_GLOW: Record<BadgeDef['rarity'], string> = {
   common:    '#6B7280',
   rare:      '#3B82F6',
-  epic:      '#A855F7',
+  epic:      '#8B5CF6',
   legendary: '#F59E0B',
 };
 
@@ -31,13 +37,13 @@ interface Props {
 }
 
 function BadgeCard({ badge, earned }: { badge: BadgeDef; earned: boolean }) {
-  const colors = earned ? RARITY_COLORS[badge.rarity] : ['#111827', '#0D1117'];
+  const bg = earned ? RARITY_COLORS[badge.rarity] : '#F9FAFB';
+  const border = earned ? RARITY_BORDER[badge.rarity] : '#E5E7EB';
   const glow = RARITY_GLOW[badge.rarity];
 
   return (
-    <View style={[styles.cardWrapper, earned && { shadowColor: glow, shadowOpacity: 0.5 }]}>
-      <LinearGradient colors={colors as [string, string]} style={styles.card}>
-        {!earned && <View style={styles.locked} />}
+    <View style={styles.cardWrapper}>
+      <View style={[styles.card, { backgroundColor: bg, borderColor: border }]}>
         <Text style={[styles.icon, !earned && styles.iconLocked]}>
           {earned ? badge.icon : '🔒'}
         </Text>
@@ -48,13 +54,13 @@ function BadgeCard({ badge, earned }: { badge: BadgeDef; earned: boolean }) {
           {badge.description}
         </Text>
         {earned && (
-          <View style={[styles.rarityTag, { backgroundColor: glow + '33', borderColor: glow }]}>
+          <View style={[styles.rarityTag, { backgroundColor: glow + '22', borderColor: glow + '55' }]}>
             <Text style={[styles.rarityText, { color: glow }]}>
               {RARITY_LABEL[badge.rarity]}
             </Text>
           </View>
         )}
-      </LinearGradient>
+      </View>
     </View>
   );
 }
@@ -72,14 +78,14 @@ export default function BadgesScreen({ data }: Props) {
 
   return (
     <SafeAreaView style={styles.root}>
-      <StatusBar barStyle="light-content" backgroundColor="#080B1A" />
-      <LinearGradient colors={['#1A0533', '#0D1B4B', '#080B1A']} style={styles.header}>
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+      <View style={styles.header}>
         <Text style={styles.title}>Badges</Text>
         <Text style={styles.subtitle}>{earnedCount} / {total} débloqués</Text>
         <View style={styles.progressBar}>
           <View style={[styles.progressFill, { width: `${(earnedCount / total) * 100}%` as any }]} />
         </View>
-      </LinearGradient>
+      </View>
 
       <FlatList
         data={sorted}
@@ -100,37 +106,40 @@ export default function BadgesScreen({ data }: Props) {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#080B1A',
+    backgroundColor: '#F9FAFB',
   },
   header: {
     paddingHorizontal: 20,
-    paddingTop: 20,
+    paddingTop: 60,
     paddingBottom: 24,
     alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
   },
   title: {
     fontSize: 28,
     fontWeight: '900',
-    color: '#E2E8F0',
+    color: '#111827',
     letterSpacing: 1,
   },
   subtitle: {
     fontSize: 14,
-    color: '#A855F7',
-    fontWeight: '700',
+    color: '#6B7280',
+    fontWeight: '600',
     marginTop: 4,
     marginBottom: 12,
   },
   progressBar: {
     width: '80%',
-    height: 6,
-    backgroundColor: '#1E293B',
+    height: 5,
+    backgroundColor: '#E5E7EB',
     borderRadius: 3,
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#A855F7',
+    backgroundColor: '#111827',
     borderRadius: 3,
   },
   list: {
@@ -145,23 +154,19 @@ const styles = StyleSheet.create({
     flex: 1,
     marginHorizontal: 4,
     borderRadius: 16,
-    shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 12,
-    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    elevation: 2,
   },
   card: {
     borderRadius: 16,
+    borderWidth: 1,
     padding: 16,
     alignItems: 'center',
     minHeight: 150,
     justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  locked: {
-    position: 'absolute',
-    top: 0, left: 0, right: 0, bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    borderRadius: 16,
   },
   icon: {
     fontSize: 40,
@@ -173,13 +178,13 @@ const styles = StyleSheet.create({
   badgeName: {
     fontSize: 13,
     fontWeight: '800',
-    color: '#E2E8F0',
+    color: '#111827',
     textAlign: 'center',
     marginBottom: 4,
   },
   badgeDesc: {
     fontSize: 11,
-    color: '#94A3B8',
+    color: '#6B7280',
     textAlign: 'center',
     lineHeight: 15,
   },
