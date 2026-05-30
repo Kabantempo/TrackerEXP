@@ -1,7 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppData, AllProfiles, Profile, Habit, DailyEntry, LaboSession, GroupTask, TaskStatus, getTodayKey, isChallengeActive, checkBadges, timeToMinutes } from '../types';
 import { supabase, getTeamId } from './supabase';
-export { loadFromSupabase };
 
 const PROFILES_KEY = 'kaban_profiles_v1';
 const LEGACY_KEY = 'xp_tracker_data_v2';
