@@ -75,7 +75,7 @@ export default function App() {
           onProfilePress={() => setShowPicker(true)}
         />
       )}
-      {tab === 'calendar' && <CalendarScreen data={data} />}
+      {tab === 'calendar' && <CalendarScreen data={data} all={all} />}
       {tab === 'labo'     && <LaboScreen  all={all} onChange={handleProfileChange} />}
       {tab === 'tasks'    && <TasksScreen all={all} onChange={handleProfileChange} />}
       {tab === 'badges'   && <BadgesScreen data={data} />}
