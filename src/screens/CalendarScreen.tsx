@@ -259,13 +259,6 @@ export default function CalendarScreen({ data, all, onChange }: Props) {
                           );
                         })}
 
-                        {/* Dots défis */}
-                        <View style={styles.indicators}>
-                          {activeChallenges.slice(0, 2).map(h => (
-                            <View key={h.id} style={[styles.dot, { backgroundColor: h.color }]} />
-                          ))}
-                        </View>
-
                         {/* Barre de progression habitudes */}
                         {filters.has('habits') && !isFuture && dailyHabits.length > 0 && (
                           <View style={styles.habitBarTrack}>
