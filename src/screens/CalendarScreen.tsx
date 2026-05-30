@@ -244,15 +244,17 @@ export default function CalendarScreen({ data, all, onChange }: Props) {
                           !isFuture && filters.has('habits') && percent > 0 && styles.dayNumActive,
                         ]}>{day}</Text>
 
-                        {/* Titres des tâches — tappable */}
+                        {/* Tâches — rectangles colorés */}
                         {dayTasks.map(task => {
                           const done   = task.status === 'done';
                           const tColor = done ? T.success : T.error;
                           return (
-                            <TouchableOpacity key={task.id} onPress={() => setSelectedTask(task)} activeOpacity={0.7}>
-                              <Text style={[styles.taskInCell, { color: tColor, textDecorationLine: done ? 'line-through' : 'none' }]} numberOfLines={1}>
-                                {task.title}
-                              </Text>
+                            <TouchableOpacity key={task.id} onPress={() => setSelectedTask(task)} activeOpacity={0.75} style={{ width: '100%' }}>
+                              <View style={[styles.taskRect, { backgroundColor: tColor + '30', borderLeftColor: tColor }]}>
+                                <Text style={[styles.taskRectText, { color: tColor, textDecorationLine: done ? 'line-through' : 'none' }]} numberOfLines={1}>
+                                  {task.title}
+                                </Text>
+                              </View>
                             </TouchableOpacity>
                           );
                         })}
@@ -296,7 +298,7 @@ export default function CalendarScreen({ data, all, onChange }: Props) {
                   <View key={habit.id} style={styles.challengeBarRow}>
                     <View style={[styles.challengeBar, { left: barLeft, width: barWidth, backgroundColor: habit.color+'22', borderColor: habit.color+'55', opacity }]}>
                       <View style={[styles.challengeBarFill, { width: `${Math.round(pct*100)}%`, backgroundColor: habit.color }]} />
-                      <Text style={[styles.challengeBarLabel, { color: habit.color }]} numberOfLines={1}>{habit.name}</Text>
+                      <Text style={styles.challengeBarLabel} numberOfLines={1}>{habit.name}</Text>
                     </View>
                   </View>
                 );
@@ -493,7 +495,8 @@ const styles = StyleSheet.create({
   challengeBarFill:{ position: 'absolute', top: 0, left: 0, bottom: 0, borderRadius: 8 },
   challengeBarLabel:{ fontSize: 8, fontWeight: '700', paddingHorizontal: 6, zIndex: 1, color: '#fff' },
 
-  taskInCell: { fontSize: 7, fontWeight: '700', width: '100%', textAlign: 'center', paddingHorizontal: 2, lineHeight: 13 },
+  taskRect:     { borderLeftWidth: 2, borderRadius: 3, paddingHorizontal: 3, paddingVertical: 1.5, marginTop: 1.5, width: '100%' },
+  taskRectText: { fontSize: 7, fontWeight: '700', textAlign: 'left' },
 
   sheetBackdrop: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.7)' },
   sheet: {
