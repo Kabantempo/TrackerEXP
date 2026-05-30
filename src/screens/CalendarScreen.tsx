@@ -1,8 +1,9 @@
 import React, { useState, useMemo } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Dimensions, Modal, Pressable } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { AppData, AllProfiles, GroupTask, Habit, getTodayKey, HABIT_COLORS } from '../types';
+import { AppData, AllProfiles, GroupTask, Habit, Profile, getTodayKey, HABIT_COLORS } from '../types';
+import { toggleGroupTask, saveAllProfiles } from '../utils/storage';
 import { T } from '../theme';
 
 const { width } = Dimensions.get('window');
@@ -50,13 +51,15 @@ type FilterKey = 'habits' | 'defis' | 'tasks';
 interface Props {
   data: AppData;
   all: AllProfiles;
+  onChange?: (all: AllProfiles) => void;
 }
 
-export default function CalendarScreen({ data, all }: Props) {
+export default function CalendarScreen({ data, all, onChange }: Props) {
   const today = new Date();
   const [year,    setYear]    = useState(today.getFullYear());
   const [month,   setMonth]   = useState(today.getMonth());
-  const [filters, setFilters] = useState<Set<FilterKey>>(new Set(['habits', 'defis', 'tasks']));
+  const [filters,      setFilters]      = useState<Set<FilterKey>>(new Set(['habits', 'defis', 'tasks']));
+  const [selectedTask, setSelectedTask] = useState<GroupTask | null>(null);
   const todayStr = getTodayKey();
 
   function toggleFilter(f: FilterKey) {
@@ -116,6 +119,29 @@ export default function CalendarScreen({ data, all }: Props) {
     { id: 'defis',  label: 'Défis',     icon: 'flag-outline',             color: '#F59E0B' },
     { id: 'tasks',  label: 'Tâches',    icon: 'checkbox-outline',         color: '#3B82F6' },
   ];
+
+  function handleToggleTask(task: GroupTask) {
+    const updated = toggleGroupTask(all, task.id);
+    onChange?.(updated);
+    saveAllProfiles(updated);
+    // Mettre à jour la tâche sélectionnée localement
+    const newStatus = task.status === 'done' ? 'todo' : 'done';
+    setSelectedTask({ ...task, status: newStatus as any });
+  }
+
+  const assignees = selectedTask
+    ? all.profiles.filter(p => {
+        const ids = Array.isArray(selectedTask.assignedTo) ? selectedTask.assignedTo : [selectedTask.assignedTo];
+        return ids.includes(p.id);
+      })
+    : [];
+  const assigner = selectedTask ? all.profiles.find(p => p.id === selectedTask.assignedBy) : null;
+
+  function formatDate(iso?: string) {
+    if (!iso) return '';
+    const [y, m, d] = iso.split('-');
+    return `${d}/${m}/${y}`;
+  }
 
   return (
     <View style={styles.root}>
@@ -218,14 +244,16 @@ export default function CalendarScreen({ data, all }: Props) {
                           !isFuture && filters.has('habits') && percent > 0 && styles.dayNumActive,
                         ]}>{day}</Text>
 
-                        {/* Titres des tâches */}
+                        {/* Titres des tâches — tappable */}
                         {dayTasks.map(task => {
                           const done   = task.status === 'done';
                           const tColor = done ? T.success : T.error;
                           return (
-                            <Text key={task.id} style={[styles.taskInCell, { color: tColor }]} numberOfLines={1}>
-                              {task.title}
-                            </Text>
+                            <TouchableOpacity key={task.id} onPress={() => setSelectedTask(task)} activeOpacity={0.7}>
+                              <Text style={[styles.taskInCell, { color: tColor, textDecorationLine: done ? 'line-through' : 'none' }]} numberOfLines={1}>
+                                {task.title}
+                              </Text>
+                            </TouchableOpacity>
                           );
                         })}
 
@@ -326,6 +354,92 @@ export default function CalendarScreen({ data, all }: Props) {
 
         <View style={{ height: 110 }} />
       </ScrollView>
+
+      {/* ── Bottom sheet détail tâche ── */}
+      <Modal visible={!!selectedTask} animationType="slide" transparent onRequestClose={() => setSelectedTask(null)}>
+        <Pressable style={styles.sheetBackdrop} onPress={() => setSelectedTask(null)} />
+        {selectedTask && (
+          <View style={styles.sheet}>
+            <View style={styles.sheetHandle} />
+
+            {/* Statut + titre */}
+            <View style={styles.sheetTitleRow}>
+              <TouchableOpacity
+                style={[styles.sheetCheckbox, selectedTask.status === 'done' && { backgroundColor: T.success, borderColor: T.success }]}
+                onPress={() => handleToggleTask(selectedTask)}
+              >
+                {selectedTask.status === 'done' && <Ionicons name="checkmark" size={14} color="#fff" />}
+              </TouchableOpacity>
+              <Text style={[styles.sheetTitle, selectedTask.status === 'done' && styles.sheetTitleDone]}>
+                {selectedTask.title}
+              </Text>
+            </View>
+
+            {/* Statut pill */}
+            <View style={[styles.sheetStatusPill, { backgroundColor: selectedTask.status === 'done' ? T.success + '22' : T.error + '22', borderColor: selectedTask.status === 'done' ? T.success + '66' : T.error + '66' }]}>
+              <Ionicons name={selectedTask.status === 'done' ? 'checkmark-circle' : 'time-outline'} size={12} color={selectedTask.status === 'done' ? T.success : T.error} />
+              <Text style={[styles.sheetStatusText, { color: selectedTask.status === 'done' ? T.success : T.error }]}>
+                {selectedTask.status === 'done' ? 'Terminée' : 'À faire'}
+              </Text>
+            </View>
+
+            {/* Description */}
+            {!!selectedTask.description && (
+              <>
+                <Text style={styles.sheetSectionLabel}>Description</Text>
+                <Text style={styles.sheetDesc}>{selectedTask.description}</Text>
+              </>
+            )}
+
+            {/* Deadline */}
+            {!!selectedTask.deadline && (
+              <View style={styles.sheetRow}>
+                <Ionicons name="calendar-outline" size={15} color={T.text2} />
+                <Text style={styles.sheetRowText}>Deadline : {formatDate(selectedTask.deadline)}</Text>
+              </View>
+            )}
+
+            {/* Assignés */}
+            {assignees.length > 0 && (
+              <>
+                <Text style={styles.sheetSectionLabel}>Assigné à</Text>
+                <View style={styles.sheetAssignees}>
+                  {assignees.map(p => {
+                    const color = /^#[0-9A-Fa-f]{6}$/.test(p.emoji) ? p.emoji : HABIT_COLORS[0];
+                    return (
+                      <View key={p.id} style={styles.sheetAssignee}>
+                        <View style={[styles.sheetAvatar, { backgroundColor: color }]}>
+                          <Text style={styles.sheetAvatarLetter}>{p.name.charAt(0).toUpperCase()}</Text>
+                        </View>
+                        <Text style={styles.sheetAssigneeName}>{p.name}</Text>
+                      </View>
+                    );
+                  })}
+                </View>
+              </>
+            )}
+
+            {/* Par qui */}
+            {assigner && (
+              <View style={styles.sheetRow}>
+                <Ionicons name="person-outline" size={15} color={T.text2} />
+                <Text style={styles.sheetRowText}>Créée par {assigner.name}</Text>
+              </View>
+            )}
+
+            {/* Bouton cocher */}
+            <TouchableOpacity
+              style={[styles.sheetToggleBtn, { backgroundColor: selectedTask.status === 'done' ? T.cardAlt : T.success }]}
+              onPress={() => handleToggleTask(selectedTask)}
+            >
+              <Ionicons name={selectedTask.status === 'done' ? 'refresh-outline' : 'checkmark-circle'} size={18} color="#fff" />
+              <Text style={styles.sheetToggleTxt}>
+                {selectedTask.status === 'done' ? 'Marquer à faire' : 'Marquer terminée'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </Modal>
     </View>
   );
 }
@@ -377,9 +491,39 @@ const styles = StyleSheet.create({
   challengeBarRow: { height: 20, position: 'relative', marginBottom: 1 },
   challengeBar:    { position: 'absolute', top: 2, height: 16, borderRadius: 8, borderWidth: 1, overflow: 'hidden', justifyContent: 'center' },
   challengeBarFill:{ position: 'absolute', top: 0, left: 0, bottom: 0, borderRadius: 8 },
-  challengeBarLabel:{ fontSize: 8, fontWeight: '700', paddingHorizontal: 6, zIndex: 1 },
+  challengeBarLabel:{ fontSize: 8, fontWeight: '700', paddingHorizontal: 6, zIndex: 1, color: '#fff' },
 
   taskInCell: { fontSize: 7, fontWeight: '700', width: '100%', textAlign: 'center', paddingHorizontal: 2, lineHeight: 13 },
+
+  sheetBackdrop: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.7)' },
+  sheet: {
+    position: 'absolute', bottom: 0, left: 0, right: 0,
+    backgroundColor: T.card, borderTopLeftRadius: 28, borderTopRightRadius: 28,
+    padding: 20, paddingBottom: 40,
+    borderTopWidth: 1, borderTopColor: T.border,
+  },
+  sheetHandle: { width: 40, height: 4, backgroundColor: T.border, borderRadius: 2, alignSelf: 'center', marginBottom: 20 },
+  sheetTitleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 12 },
+  sheetCheckbox: {
+    width: 24, height: 24, borderRadius: 12,
+    borderWidth: 1.5, borderColor: T.border,
+    backgroundColor: T.cardAlt, alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2,
+  },
+  sheetTitle:     { flex: 1, fontSize: 20, fontWeight: '800', color: T.text },
+  sheetTitleDone: { textDecorationLine: 'line-through', color: T.text2 },
+  sheetStatusPill:{ flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10, borderWidth: 1, marginBottom: 16 },
+  sheetStatusText:{ fontSize: 12, fontWeight: '700' },
+  sheetSectionLabel: { fontSize: 11, color: T.text2, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8, marginTop: 12 },
+  sheetDesc:      { fontSize: 14, color: T.text2, lineHeight: 20 },
+  sheetRow:       { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12 },
+  sheetRowText:   { fontSize: 14, color: T.text2, fontWeight: '600' },
+  sheetAssignees: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  sheetAssignee:  { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  sheetAvatar:    { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
+  sheetAvatarLetter: { color: '#fff', fontWeight: '800', fontSize: 13 },
+  sheetAssigneeName: { fontSize: 14, color: T.text, fontWeight: '600' },
+  sheetToggleBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 14, paddingVertical: 14, marginTop: 20 },
+  sheetToggleTxt: { color: '#fff', fontWeight: '800', fontSize: 15 },
 
   legend:      { marginTop: 12, backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 16, padding: 14 },
   legendTitle: { fontSize: 10, color: T.accentSoft, fontWeight: '700', letterSpacing: 1, marginBottom: 8, textTransform: 'uppercase' },
