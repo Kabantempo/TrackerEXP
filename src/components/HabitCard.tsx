@@ -173,42 +173,59 @@ export default function HabitCard({ habit, entry, data, onYes, onNo, onEdit, onD
 
               {/* Boutons statut */}
               <View style={styles.btns}>
-                <Pressable
-                  style={({ pressed }) => [
-                    styles.btn,
-                    isMissed && { backgroundColor: T.error + '22', borderColor: T.error + '66' },
-                    pressed && { opacity: 0.75 },
-                  ]}
-                  onPress={handleNo}
-                  accessibilityLabel="Marquer comme raté"
-                >
-                  <Ionicons
-                    name={isMissed ? 'close-circle' : 'close'}
-                    size={14}
-                    color={isMissed ? T.error : T.text3}
-                  />
-                  {isMissed && <Text style={[styles.btnTxt, { color: T.error }]}>Raté</Text>}
-                </Pressable>
-
-                <Pressable
-                  style={({ pressed }) => [
-                    styles.btn,
-                    styles.btnYes,
-                    isDone && { backgroundColor: color, borderColor: color, shadowColor: color, shadowOpacity: 0.4 },
-                    pressed && { opacity: 0.75 },
-                  ]}
-                  onPress={handleYes}
-                  accessibilityLabel="Marquer comme fait"
-                >
-                  <Ionicons
-                    name={isDone ? 'checkmark-circle' : 'checkmark'}
-                    size={14}
-                    color={isDone ? '#fff' : T.text2}
-                  />
-                  <Text style={[styles.btnTxt, isDone && { color: '#fff' }]}>
-                    {isDone ? 'Fait' : 'Valider'}
-                  </Text>
-                </Pressable>
+                {/* Défi : seulement le bouton Raté (le Fait est automatique) */}
+                {isChallenge ? (
+                  <>
+                    {!isMissed ? (
+                      <View style={[styles.btn, { backgroundColor: color + '22', borderColor: color + '55' }]}>
+                        <Ionicons name="checkmark-circle" size={14} color={color} />
+                        <Text style={[styles.btnTxt, { color }]}>Auto</Text>
+                      </View>
+                    ) : null}
+                    <Pressable
+                      style={({ pressed }) => [
+                        styles.btn,
+                        isMissed && { backgroundColor: T.error + '22', borderColor: T.error + '66' },
+                        pressed && { opacity: 0.75 },
+                      ]}
+                      onPress={handleNo}
+                      accessibilityLabel="Marquer comme raté"
+                    >
+                      <Ionicons name={isMissed ? 'close-circle' : 'close'} size={14} color={isMissed ? T.error : T.text3} />
+                      <Text style={[styles.btnTxt, isMissed && { color: T.error }]}>Raté</Text>
+                    </Pressable>
+                  </>
+                ) : (
+                  /* Habitude quotidienne : Yes + No classiques */
+                  <>
+                    <Pressable
+                      style={({ pressed }) => [
+                        styles.btn,
+                        isMissed && { backgroundColor: T.error + '22', borderColor: T.error + '66' },
+                        pressed && { opacity: 0.75 },
+                      ]}
+                      onPress={handleNo}
+                      accessibilityLabel="Marquer comme raté"
+                    >
+                      <Ionicons name={isMissed ? 'close-circle' : 'close'} size={14} color={isMissed ? T.error : T.text3} />
+                      {isMissed && <Text style={[styles.btnTxt, { color: T.error }]}>Raté</Text>}
+                    </Pressable>
+                    <Pressable
+                      style={({ pressed }) => [
+                        styles.btn,
+                        isDone && { backgroundColor: color, borderColor: color, shadowColor: color, shadowOpacity: 0.4 },
+                        pressed && { opacity: 0.75 },
+                      ]}
+                      onPress={handleYes}
+                      accessibilityLabel="Marquer comme fait"
+                    >
+                      <Ionicons name={isDone ? 'checkmark-circle' : 'checkmark'} size={14} color={isDone ? '#fff' : T.text2} />
+                      <Text style={[styles.btnTxt, isDone && { color: '#fff' }]}>
+                        {isDone ? 'Fait' : 'Valider'}
+                      </Text>
+                    </Pressable>
+                  </>
+                )}
               </View>
             </View>
           </View>

@@ -5,7 +5,7 @@ import XPHeader from '../components/XPHeader';
 import HabitCard from '../components/HabitCard';
 import HabitModal from '../components/HabitModal';
 import { AppData, Habit, Profile, getTodayKey } from '../types';
-import { getEntryForHabit, setHabitStatus } from '../utils/storage';
+import { getEntryForHabit, setHabitStatus, autoCompleteChallengesToday, saveAllProfiles } from '../utils/storage';
 import { T } from '../theme';
 
 interface Props {
@@ -22,7 +22,14 @@ export default function HomeScreen({ onDataChange, profileData, profile, onProfi
   const [modalVisible, setModalVisible] = useState(false);
   const [editingHabit, setEditingHabit] = useState<Habit | undefined>();
 
-  useEffect(() => { if (profileData) setData(profileData); }, [profileData, profile?.id]);
+  useEffect(() => {
+    if (profileData) {
+      // Auto-valide les défis actifs dès l'ouverture
+      const updated = autoCompleteChallengesToday(profileData);
+      setData(updated);
+      if (updated !== profileData) onDataChange?.(updated);
+    }
+  }, [profileData, profile?.id]);
 
   const today         = getTodayKey();
   const completedToday = data.entries.filter(e => e.date === today && e.status === 'yes').length;

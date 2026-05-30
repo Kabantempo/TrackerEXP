@@ -139,6 +139,22 @@ export function renameProfile(all: AllProfiles, id: string, name: string, emoji:
   };
 }
 
+// Auto-valide les défis actifs du jour s'ils n'ont pas d'entrée "no"
+export function autoCompleteChallengesToday(data: AppData): AppData {
+  const today = getTodayKey();
+  const active = data.habits.filter(h => h.type === 'challenge' && isChallengeActive(h, today));
+  let result = data;
+  for (const habit of active) {
+    const existing = result.entries.find(e => e.date === today && e.habitId === habit.id);
+    if (!existing) {
+      // Pas d'entrée → auto "yes"
+      result = setHabitStatus(result, habit.id, 'yes', habit.xpReward, today);
+    }
+    // Si l'entrée existe déjà (yes ou no), on ne touche à rien
+  }
+  return result;
+}
+
 // Fonctions compatibilité (utilisées par HomeScreen)
 export function getEntryForHabit(data: AppData, habitId: string, date?: string): DailyEntry | undefined {
   const d = date ?? getTodayKey();
