@@ -6,64 +6,63 @@ import CalendarScreen from './src/screens/CalendarScreen';
 import BadgesScreen from './src/screens/BadgesScreen';
 import LaboScreen from './src/screens/LaboScreen';
 import TasksScreen from './src/screens/TasksScreen';
-import ProfilePickerScreen from './src/screens/ProfilePickerScreen';
 import TeamSetupScreen from './src/screens/TeamSetupScreen';
 import TabBar, { TabName } from './src/components/TabBar';
 import { AllProfiles, AppData, checkBadges } from './src/types';
 import {
   loadAllProfiles, saveAllProfiles, getActiveData, setActiveData, loadFromSupabase,
 } from './src/utils/storage';
-import { getTeamId } from './src/utils/supabase';
+import { getTeamId, getMyProfileId, setMyProfileId } from './src/utils/supabase';
 
-const POLL_INTERVAL = 30000; // 30 secondes
+const POLL_INTERVAL = 30000;
 
 export default function App() {
   const [tab,        setTab]        = useState<TabName>('home');
-  const [showPicker, setShowPicker] = useState(true);
-  const [teamReady,  setTeamReady]  = useState(false);
+  const [ready,      setReady]      = useState(false);   // setup terminé
   const [all,        setAll]        = useState<AllProfiles>({ profiles: [], activeId: '', data: {} });
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const appState = useRef(AppState.currentState);
+  const [myId,       setMyId]       = useState('');
+  const pollRef  = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Charge le team ID au démarrage
+  // Chargement initial
   useEffect(() => {
     (async () => {
-      const teamId = await getTeamId();
-      if (teamId) {
+      const teamId   = await getTeamId();
+      const profileId = await getMyProfileId();
+      if (teamId && profileId) {
         const loaded = await loadAllProfiles();
-        setAll(loaded);
-        setTeamReady(true);
-        if (loaded.profiles.length === 1 && !loaded.profiles[0].password) setShowPicker(false);
+        // S'assurer que le profil existe encore dans l'équipe
+        if (loaded.profiles.some(p => p.id === profileId)) {
+          const withActive = { ...loaded, activeId: profileId };
+          setAll(withActive);
+          setMyId(profileId);
+          setReady(true);
+          return;
+        }
       }
+      // Pas encore configuré
     })();
   }, []);
 
-  // Polling toutes les 30s pour sync équipe
+  // Polling 30s
   const startPolling = useCallback(() => {
     if (pollRef.current) clearInterval(pollRef.current);
     pollRef.current = setInterval(async () => {
       const remote = await loadFromSupabase();
-      if (remote) setAll(remote);
+      if (remote) setAll(prev => ({ ...remote, activeId: prev.activeId }));
     }, POLL_INTERVAL);
   }, []);
 
   useEffect(() => {
-    if (!teamReady) return;
+    if (!ready) return;
     startPolling();
     const sub = AppState.addEventListener('change', state => {
       if (state === 'active') {
-        // Rafraîchit immédiatement quand l'app reprend le focus
-        loadFromSupabase().then(remote => { if (remote) setAll(remote); });
+        loadFromSupabase().then(r => { if (r) setAll(prev => ({ ...r, activeId: prev.activeId })); });
         startPolling();
-      } else if (pollRef.current) {
-        clearInterval(pollRef.current);
-      }
+      } else if (pollRef.current) clearInterval(pollRef.current);
     });
     return () => { sub.remove(); if (pollRef.current) clearInterval(pollRef.current); };
-  }, [teamReady, startPolling]);
-
-  const data          = getActiveData(all);
-  const activeProfile = all.profiles.find(p => p.id === all.activeId) ?? all.profiles[0];
+  }, [ready, startPolling]);
 
   function handleDataChange(newData: AppData) {
     const checked = checkBadges(newData);
@@ -73,38 +72,24 @@ export default function App() {
   }
 
   function handleProfileChange(newAll: AllProfiles) {
-    setAll(newAll);
+    setAll(prev => ({ ...newAll, activeId: prev.activeId }));
     saveAllProfiles(newAll);
   }
 
-  function handleSelectProfile(profileId: string) {
-    const newAll = { ...all, activeId: profileId };
-    setAll(newAll);
-    saveAllProfiles(newAll);
-    setShowPicker(false);
+  function handleTeamReady(initialAll: AllProfiles, profileId: string) {
+    const withActive = { ...initialAll, activeId: profileId };
+    setAll(withActive);
+    setMyId(profileId);
+    setMyProfileId(profileId);
+    setReady(true);
   }
 
-  function handleTeamReady(initialAll: AllProfiles, teamId: string) {
-    setAll(initialAll);
-    setTeamReady(true);
-    setShowPicker(initialAll.profiles.length > 0);
+  if (!ready) {
+    return <TeamSetupScreen onReady={handleTeamReady} />;
   }
 
-  // Écran de setup équipe (première ouverture)
-  if (!teamReady) {
-    return <TeamSetupScreen onTeamReady={handleTeamReady} />;
-  }
-
-  // Sélection de profil (style Netflix)
-  if (showPicker || !all.activeId) {
-    return (
-      <ProfilePickerScreen
-        all={all}
-        onChange={handleProfileChange}
-        onSelect={handleSelectProfile}
-      />
-    );
-  }
+  const data          = getActiveData(all);
+  const activeProfile = all.profiles.find(p => p.id === myId) ?? all.profiles[0];
 
   return (
     <View style={styles.root}>
@@ -113,7 +98,7 @@ export default function App() {
           onDataChange={handleDataChange}
           profileData={data}
           profile={activeProfile}
-          onProfilePress={() => setShowPicker(true)}
+          onProfilePress={() => {}} // plus de changement de profil
         />
       )}
       {tab === 'calendar' && <CalendarScreen data={data} all={all} />}

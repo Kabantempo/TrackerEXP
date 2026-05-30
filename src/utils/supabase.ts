@@ -2,7 +2,8 @@ import 'react-native-url-polyfill/auto';
 import { createClient } from '@supabase/supabase-js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const TEAM_ID_KEY = 'kaban_team_id';
+const TEAM_ID_KEY       = 'kaban_team_id';
+const MY_PROFILE_ID_KEY = 'kaban_my_profile_id';
 
 const CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
@@ -20,6 +21,14 @@ export async function setTeamId(id: string): Promise<void> {
 
 export async function clearTeamId(): Promise<void> {
   await AsyncStorage.removeItem(TEAM_ID_KEY);
+}
+
+export async function getMyProfileId(): Promise<string | null> {
+  return AsyncStorage.getItem(MY_PROFILE_ID_KEY);
+}
+
+export async function setMyProfileId(id: string): Promise<void> {
+  await AsyncStorage.setItem(MY_PROFILE_ID_KEY, id);
 }
 
 export const supabase = createClient(
