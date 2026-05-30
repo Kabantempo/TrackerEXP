@@ -196,33 +196,45 @@ export default function CalendarScreen({ data, all }: Props) {
                   const dayTasks = filters.has('tasks') ? (tasksThisMonth[date] ?? []) : [];
                   const hasTasks = dayTasks.length > 0;
 
+                  const pctInt = Math.round(percent * 100);
+                  const barColor = percent === 1
+                    ? T.accent
+                    : percent >= 0.67 ? '#15803D'
+                    : percent >= 0.34 ? '#B45309'
+                    : '#991B1B';
+
                   return (
                     <View key={di} style={[styles.cell, { width: DAY_SIZE, height: DAY_SIZE }]}>
                       <View style={[styles.dayInner, isToday && styles.todayBorder]}>
-                        {/* Fond habitudes */}
-                        {hasHabitData ? (
-                          <LinearGradient colors={[c1, c2]} style={StyleSheet.absoluteFill} />
-                        ) : (
-                          <View style={[StyleSheet.absoluteFill, styles.emptyDayBg]} />
-                        )}
+                        <View style={[StyleSheet.absoluteFill, styles.emptyDayBg]} />
 
                         {/* Numéro */}
                         <Text style={[
                           styles.dayNum,
-                          hasHabitData && styles.dayNumLight,
-                          isToday      && !hasHabitData && styles.dayNumToday,
-                          isFuture     && styles.dayNumFuture,
+                          isToday  && styles.dayNumToday,
+                          isFuture && styles.dayNumFuture,
+                          !isFuture && filters.has('habits') && percent > 0 && styles.dayNumActive,
                         ]}>{day}</Text>
 
-                        {/* Indicateurs en bas */}
+                        {/* Barre de progression habitudes */}
+                        {filters.has('habits') && !isFuture && dailyHabits.length > 0 && (
+                          <View style={styles.habitBarTrack}>
+                            <View style={[styles.habitBarFill, {
+                              width: `${pctInt}%` as any,
+                              backgroundColor: barColor,
+                              shadowColor: pctInt === 100 ? T.accent : 'transparent',
+                              shadowOpacity: 0.8,
+                              shadowRadius: 4,
+                              shadowOffset: { width: 0, height: 0 },
+                            }]} />
+                          </View>
+                        )}
+
+                        {/* Dots défis / tâches */}
                         <View style={styles.indicators}>
-                          {/* Jour parfait */}
-                          {isPerfect && <View style={[styles.dot, { backgroundColor: '#fff' }]} />}
-                          {/* Défis actifs */}
                           {activeChallenges.slice(0, 2).map(h => (
                             <View key={h.id} style={[styles.dot, { backgroundColor: h.color }]} />
                           ))}
-                          {/* Tâches dues */}
                           {hasTasks && <View style={[styles.dot, { backgroundColor: '#3B82F6' }]} />}
                         </View>
                       </View>
@@ -363,12 +375,14 @@ const styles = StyleSheet.create({
     flex: 1, borderRadius: 9, overflow: 'hidden',
     alignItems: 'center', paddingTop: 3, paddingBottom: 2,
   },
-  emptyDayBg: { backgroundColor: T.cardAlt, opacity: 0.5 },
-  todayBorder: { borderWidth: 1.5, borderColor: T.accent },
-  dayNum:      { fontSize: 11, fontWeight: '600', color: T.text2, zIndex: 1 },
-  dayNumLight: { color: '#fff', fontWeight: '700' },
-  dayNumToday: { color: T.accentSoft, fontWeight: '800' },
-  dayNumFuture:{ color: T.text3 },
+  emptyDayBg:   { backgroundColor: T.cardAlt, opacity: 0.6 },
+  todayBorder:  { borderWidth: 1.5, borderColor: T.accent },
+  dayNum:       { fontSize: 11, fontWeight: '600', color: T.text2, zIndex: 1 },
+  dayNumActive: { color: T.text, fontWeight: '700' },
+  dayNumToday:  { color: T.accentSoft, fontWeight: '800' },
+  dayNumFuture: { color: T.text3 },
+  habitBarTrack:{ width: '90%', height: 4, backgroundColor: T.border, borderRadius: 2, overflow: 'hidden', marginTop: 'auto' as any },
+  habitBarFill: { height: '100%', borderRadius: 2 },
 
   indicators: { flexDirection: 'row', gap: 2, marginTop: 2, flexWrap: 'wrap', justifyContent: 'center', paddingHorizontal: 2 },
   dot:        { width: 5, height: 5, borderRadius: 2.5 },
