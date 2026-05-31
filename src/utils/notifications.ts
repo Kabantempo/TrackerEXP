@@ -13,6 +13,20 @@ Notifications.setNotificationHandler({
   }),
 });
 
+export async function sendTaskAssignedNotif(taskTitle: string, creatorName: string, assigneeNames: string[]): Promise<void> {
+  if (Platform.OS === 'web') return;
+  const { status } = await Notifications.getPermissionsAsync();
+  if (status !== 'granted') return;
+  const who = assigneeNames.join(', ');
+  await Notifications.scheduleNotificationAsync({
+    content: {
+      title: '📋 Nouvelle tâche assignée',
+      body: `"${taskTitle}" → ${who} (de ${creatorName})`,
+    },
+    trigger: null,
+  });
+}
+
 export async function requestNotifPermission(): Promise<boolean> {
   if (Platform.OS === 'web') return false;
   const { status } = await Notifications.requestPermissionsAsync();

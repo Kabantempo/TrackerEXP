@@ -10,6 +10,7 @@ import {
   addGroupTask, toggleGroupTask, deleteGroupTask, editGroupTask, addTaskComment, saveAllProfiles,
 } from '../utils/storage';
 import { fetchAllCommits, fetchAllNpmPackageNames, startDeviceFlow, pollDeviceFlow, fetchGitHubUser, fetchUserRepos, DeviceFlowData } from '../utils/github';
+import { sendTaskAssignedNotif } from '../utils/notifications';
 import TaskModal from '../components/TaskModal';
 import { T } from '../theme';
 
@@ -386,6 +387,12 @@ export default function TasksScreen({ all, onChange }: Props) {
       updated = editGroupTask(all, editingTask.id, title, desc, assignedTo, deadline, priority);
     } else {
       updated = addGroupTask(all, activeId, assignedTo, title, desc, deadline, priority);
+      const others = assignedTo.filter(id => id !== activeId);
+      if (others.length > 0) {
+        const creator = all.profiles.find(p => p.id === activeId);
+        const names = others.map(id => all.profiles.find(p => p.id === id)?.name ?? id);
+        sendTaskAssignedNotif(title, creator?.name ?? 'Quelqu\'un', names);
+      }
     }
     onChange(updated); saveAllProfiles(updated);
     setEditingTask(undefined);
