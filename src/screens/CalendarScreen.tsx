@@ -60,6 +60,7 @@ export default function CalendarScreen({ data, all, onChange }: Props) {
   const [month,   setMonth]   = useState(today.getMonth());
   const [filters,      setFilters]      = useState<Set<FilterKey>>(new Set(['habits', 'defis', 'tasks', 'commits']));
   const [selectedTask, setSelectedTask] = useState<GroupTask | null>(null);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const todayStr = getTodayKey();
 
   function toggleFilter(f: FilterKey) {
@@ -250,7 +251,11 @@ export default function CalendarScreen({ data, all, onChange }: Props) {
 
                   return (
                     <View key={di} style={[styles.cell, { width: DAY_SIZE, height: DAY_SIZE }]}>
-                      <View style={[styles.dayInner, isToday && styles.todayBorder]}>
+                      <TouchableOpacity
+                        style={[styles.dayInner, isToday && styles.todayBorder]}
+                        onPress={() => setSelectedDate(date)}
+                        activeOpacity={0.7}
+                      >
                         <View style={[StyleSheet.absoluteFill, styles.emptyDayBg]} />
 
                         {/* Numéro */}
@@ -293,7 +298,7 @@ export default function CalendarScreen({ data, all, onChange }: Props) {
                             }]} />
                           </View>
                         )}
-                      </View>
+                      </TouchableOpacity>
                     </View>
                   );
                 })}
@@ -393,6 +398,118 @@ export default function CalendarScreen({ data, all, onChange }: Props) {
 
         <View style={{ height: 110 }} />
       </ScrollView>
+
+      {/* ── Bottom sheet détail du jour ── */}
+      <Modal visible={!!selectedDate} animationType="slide" transparent onRequestClose={() => setSelectedDate(null)}>
+        <Pressable style={styles.sheetBackdrop} onPress={() => setSelectedDate(null)} />
+        {selectedDate && (() => {
+          const dayTasks   = tasksThisMonth[selectedDate] ?? [];
+          const dayCommits = commitsThisMonth[selectedDate] ?? [];
+          const { percent } = getDailyCompletion(data, selectedDate);
+          const [dd, mm, yyyy] = [selectedDate.slice(8,10), selectedDate.slice(5,7), selectedDate.slice(0,4)];
+          const hasAnything = dayTasks.length > 0 || dayCommits.length > 0 || (dailyHabits.length > 0 && !isFutureFn(selectedDate));
+
+          function isFutureFn(d: string) { return d > todayStr; }
+
+          return (
+            <View style={styles.sheet}>
+              <View style={styles.sheetHandle} />
+
+              {/* Date + stats */}
+              <View style={styles.daySheetHeader}>
+                <Text style={styles.daySheetDate}>{dd}/{mm}/{yyyy}</Text>
+                {selectedDate === todayStr && (
+                  <View style={styles.daySheetTodayBadge}>
+                    <Text style={styles.daySheetTodayTxt}>Aujourd'hui</Text>
+                  </View>
+                )}
+              </View>
+
+              {!hasAnything ? (
+                <View style={styles.daySheetEmpty}>
+                  <Ionicons name="calendar-outline" size={32} color={T.text3} />
+                  <Text style={styles.daySheetEmptyTxt}>Rien ce jour</Text>
+                </View>
+              ) : (
+                <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 420 }}>
+
+                  {/* Habitudes */}
+                  {dailyHabits.length > 0 && !isFutureFn(selectedDate) && (
+                    <View style={styles.daySheetSection}>
+                      <Text style={styles.daySheetSectionTitle}>Habitudes</Text>
+                      <View style={styles.daySheetHabitBar}>
+                        <View style={[styles.daySheetHabitFill, { width: `${Math.round(percent * 100)}%` as any, backgroundColor: percent === 1 ? T.accent : percent >= 0.5 ? '#15803D' : '#B45309' }]} />
+                        <Text style={styles.daySheetHabitPct}>{Math.round(percent * 100)}%</Text>
+                      </View>
+                    </View>
+                  )}
+
+                  {/* Commits GitHub */}
+                  {dayCommits.length > 0 && (
+                    <View style={styles.daySheetSection}>
+                      <Text style={styles.daySheetSectionTitle}>
+                        <Ionicons name="logo-github" size={11} color="#8b949e" /> Commits · {dayCommits.length}
+                      </Text>
+                      {dayCommits.map(c => {
+                        const repoShort = c.repo.split('/')[1] ?? c.repo;
+                        return (
+                          <View key={`${c.repo}-${c.sha}`} style={styles.daySheetCommit}>
+                            <View style={styles.daySheetCommitLeft}>
+                              <View style={styles.daySheetCommitShaWrap}>
+                                <Text style={styles.daySheetCommitSha}>{c.sha}</Text>
+                              </View>
+                              <View style={styles.daySheetRepoBadge}>
+                                <Ionicons name="git-branch-outline" size={9} color="#8b949e" />
+                                <Text style={styles.daySheetRepoName}>{repoShort}</Text>
+                              </View>
+                            </View>
+                            <View style={{ flex: 1 }}>
+                              <Text style={styles.daySheetCommitMsg} numberOfLines={2}>{c.message}</Text>
+                              <Text style={styles.daySheetCommitAuthor}>{c.author}</Text>
+                            </View>
+                          </View>
+                        );
+                      })}
+                    </View>
+                  )}
+
+                  {/* Tâches */}
+                  {dayTasks.length > 0 && (
+                    <View style={styles.daySheetSection}>
+                      <Text style={styles.daySheetSectionTitle}>Tâches · {dayTasks.length}</Text>
+                      {dayTasks.map(task => {
+                        const done = task.status === 'done';
+                        return (
+                          <TouchableOpacity
+                            key={task.id}
+                            style={styles.daySheetTask}
+                            onPress={() => { setSelectedDate(null); setTimeout(() => setSelectedTask(task), 200); }}
+                          >
+                            <View style={[styles.daySheetTaskDot, { backgroundColor: done ? T.success : T.error }]} />
+                            <View style={{ flex: 1 }}>
+                              <Text style={[styles.daySheetTaskTitle, done && { textDecorationLine: 'line-through', opacity: 0.5 }]} numberOfLines={1}>
+                                {task.title}
+                              </Text>
+                              {task.description ? <Text style={styles.daySheetTaskDesc} numberOfLines={1}>{task.description}</Text> : null}
+                            </View>
+                            <View style={[styles.daySheetTaskStatus, { backgroundColor: done ? T.success + '22' : T.error + '22' }]}>
+                              <Text style={[styles.daySheetTaskStatusTxt, { color: done ? T.success : T.error }]}>
+                                {done ? 'Fait' : 'À faire'}
+                              </Text>
+                            </View>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  )}
+
+                  <View style={{ height: 20 }} />
+                </ScrollView>
+              )}
+            </View>
+          );
+        })()}
+      </Modal>
 
       {/* ── Bottom sheet détail tâche ── */}
       <Modal visible={!!selectedTask} animationType="slide" transparent onRequestClose={() => setSelectedTask(null)}>
@@ -571,6 +688,32 @@ const styles = StyleSheet.create({
   legendItem:  { flexDirection: 'row', alignItems: 'center', gap: 5 },
   legendDot:   { width: 9, height: 9, borderRadius: 4.5 },
   legendLabel: { fontSize: 10, color: T.text2 },
+
+  daySheetHeader:      { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16 },
+  daySheetDate:        { fontSize: 22, fontWeight: '900', color: T.text },
+  daySheetTodayBadge:  { backgroundColor: T.accentDim, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
+  daySheetTodayTxt:    { fontSize: 11, color: T.accentSoft, fontWeight: '700' },
+  daySheetEmpty:       { alignItems: 'center', paddingVertical: 30, gap: 8 },
+  daySheetEmptyTxt:    { fontSize: 14, color: T.text3 },
+  daySheetSection:     { marginBottom: 18 },
+  daySheetSectionTitle:{ fontSize: 11, color: T.text2, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 10 },
+  daySheetHabitBar:    { height: 10, backgroundColor: T.cardAlt, borderRadius: 5, overflow: 'hidden', position: 'relative' },
+  daySheetHabitFill:   { position: 'absolute', top: 0, left: 0, bottom: 0, borderRadius: 5 },
+  daySheetHabitPct:    { position: 'absolute', right: 6, top: -1, fontSize: 9, color: T.text2, fontWeight: '700' },
+  daySheetCommit:      { flexDirection: 'row', gap: 10, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: T.border },
+  daySheetCommitLeft:  { gap: 4, alignItems: 'flex-start', flexShrink: 0 },
+  daySheetCommitShaWrap:{ backgroundColor: '#161b22', borderRadius: 5, paddingHorizontal: 5, paddingVertical: 2 },
+  daySheetCommitSha:   { fontSize: 10, color: '#58a6ff', fontWeight: '700' },
+  daySheetRepoBadge:   { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#30363d', borderRadius: 5, paddingHorizontal: 5, paddingVertical: 2 },
+  daySheetRepoName:    { fontSize: 9, color: '#8b949e', fontWeight: '600' },
+  daySheetCommitMsg:   { fontSize: 13, fontWeight: '600', color: T.text, lineHeight: 17 },
+  daySheetCommitAuthor:{ fontSize: 11, color: T.text3, marginTop: 2 },
+  daySheetTask:        { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: T.border },
+  daySheetTaskDot:     { width: 8, height: 8, borderRadius: 4, flexShrink: 0 },
+  daySheetTaskTitle:   { fontSize: 14, fontWeight: '600', color: T.text },
+  daySheetTaskDesc:    { fontSize: 11, color: T.text3, marginTop: 2 },
+  daySheetTaskStatus:  { borderRadius: 7, paddingHorizontal: 7, paddingVertical: 3 },
+  daySheetTaskStatusTxt:{ fontSize: 10, fontWeight: '700' },
 
   commitDotRow:   { flexDirection: 'row', alignItems: 'center', gap: 2, marginTop: 1.5 },
   commitDot:      { width: 5, height: 5, borderRadius: 2.5, backgroundColor: '#8b949e' },
