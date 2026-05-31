@@ -8,7 +8,8 @@
       "channel": "preview",
       "env": {
         "EXPO_PUBLIC_SUPABASE_URL": "https://hyptdtktxbdffyndjfjz.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_JFQTCuzwq6ls3nuo_qTQoQ_LDjIoLcy"
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_JFQTCuzwq6ls3nuo_qTQoQ_LDjIoLcy",
+        "EXPO_PUBLIC_GITHUB_CLIENT_ID": "Ov23liAQiPOcXfFWCHyU"
       },
       "android": {
         "buildType": "apk"

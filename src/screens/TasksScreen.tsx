@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
   StatusBar, Alert, Pressable, Modal, TextInput, ScrollView, Linking, ActivityIndicator,
@@ -9,7 +9,7 @@ import { AllProfiles, Profile, GroupTask, TaskPriority, GitHubRepo, GitHubCommit
 import {
   addGroupTask, toggleGroupTask, deleteGroupTask, editGroupTask, addTaskComment, saveAllProfiles,
 } from '../utils/storage';
-import { fetchAllCommits } from '../utils/github';
+import { fetchAllCommits, startDeviceFlow, pollDeviceFlow, fetchGitHubUser, fetchUserRepos, DeviceFlowData } from '../utils/github';
 import TaskModal from '../components/TaskModal';
 import { T } from '../theme';
 
@@ -55,62 +55,55 @@ function CommitCard({ commit }: { commit: GitHubCommit }) {
   );
 }
 
-function GitHubModal({ token: initialToken, repos: initialRepos, onSave, onClose, onRefresh }: {
-  token?: string;
-  repos: GitHubRepo[];
-  onSave: (token: string, repos: GitHubRepo[]) => void;
+function GitHubModal({ ghUser, onAuth, onDisconnect, onClose, onRefresh }: {
+  ghUser?: { login: string; name: string };
+  onAuth: (token: string, user: { login: string; name: string }, repos: GitHubRepo[]) => void;
+  onDisconnect: () => void;
   onClose: () => void;
   onRefresh: () => void;
 }) {
-  const [step,      setStep]      = useState<'token' | 'repos'>(initialToken ? 'repos' : 'token');
-  const [token,     setToken]     = useState(initialToken ?? '');
-  const [allRepos,  setAllRepos]  = useState<{ owner: string; repo: string; private: boolean }[]>([]);
-  const [selected,  setSelected]  = useState<Set<string>>(new Set(initialRepos.map(r => `${r.owner}/${r.repo}`)));
-  const [search,    setSearch]    = useState('');
-  const [loading,   setLoading]   = useState(false);
-  const [error,     setError]     = useState('');
+  type Step = 'idle' | 'starting' | 'pending' | 'loading';
+  const [step,       setStep]       = useState<Step>('idle');
+  const [flow,       setFlow]       = useState<DeviceFlowData | null>(null);
+  const [error,      setError]      = useState('');
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  useEffect(() => {
-    if (initialToken && step === 'repos') loadRepos(initialToken);
-  }, []);
+  useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current); }, []);
 
-  async function loadRepos(t: string) {
-    setLoading(true);
+  async function handleStartFlow() {
+    setStep('starting');
     setError('');
     try {
-      const res = await fetch('https://api.github.com/user/repos?per_page=100&sort=updated', {
-        headers: { Authorization: `token ${t}`, Accept: 'application/vnd.github.v3+json' },
-      });
-      if (!res.ok) { setError('Token invalide ou expiré.'); setLoading(false); return; }
-      const data = await res.json();
-      setAllRepos(data.map((r: any) => ({ owner: r.owner.login, repo: r.name, private: r.private })));
-      setStep('repos');
+      const data = await startDeviceFlow();
+      setFlow(data);
+      setStep('pending');
+      pollRef.current = setInterval(async () => {
+        try {
+          const token = await pollDeviceFlow(data.device_code);
+          if (token) {
+            clearInterval(pollRef.current!);
+            setStep('loading');
+            const [user, repos] = await Promise.all([
+              fetchGitHubUser(token),
+              fetchUserRepos(token),
+            ]);
+            if (!user) { setError('Autorisation échouée.'); setStep('idle'); return; }
+            onAuth(token, user, repos);
+            onClose();
+          }
+        } catch {
+          clearInterval(pollRef.current!);
+          setError('Autorisation expirée ou refusée.');
+          setStep('idle');
+        }
+      }, (data.interval ?? 5) * 1000);
     } catch {
-      setError('Erreur de connexion.');
+      setError('Erreur de connexion à GitHub.');
+      setStep('idle');
     }
-    setLoading(false);
   }
 
-  function toggleRepo(key: string) {
-    setSelected(prev => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key); else next.add(key);
-      return next;
-    });
-  }
-
-  function handleSave() {
-    const repos: GitHubRepo[] = [...selected].map(key => {
-      const [owner, repo] = key.split('/');
-      return { owner, repo, token };
-    });
-    onSave(token, repos);
-    onClose();
-  }
-
-  const filtered = allRepos.filter(r =>
-    `${r.owner}/${r.repo}`.toLowerCase().includes(search.toLowerCase())
-  );
+  const isConnected = !!ghUser;
 
   return (
     <Modal visible animationType="slide" transparent onRequestClose={onClose}>
@@ -119,10 +112,8 @@ function GitHubModal({ token: initialToken, repos: initialRepos, onSave, onClose
         <View style={styles.ghHandle} />
         <View style={styles.ghTitleRow}>
           <Ionicons name="logo-github" size={20} color={T.text} />
-          <Text style={styles.ghTitle}>
-            {step === 'token' ? 'Connexion GitHub' : 'Sélectionner des repos'}
-          </Text>
-          {step === 'repos' && (
+          <Text style={styles.ghTitle}>GitHub</Text>
+          {isConnected && (
             <TouchableOpacity onPress={onRefresh} style={styles.ghRefreshBtn}>
               <Ionicons name="refresh-outline" size={16} color={T.accentSoft} />
               <Text style={styles.ghRefreshTxt}>Sync</Text>
@@ -130,85 +121,81 @@ function GitHubModal({ token: initialToken, repos: initialRepos, onSave, onClose
           )}
         </View>
 
-        {step === 'token' ? (
+        {isConnected ? (
           <>
+            <View style={styles.ghProfileRow}>
+              <View style={styles.ghAvatar}>
+                <Ionicons name="person" size={22} color="#fff" />
+              </View>
+              <View>
+                <Text style={styles.ghLogin}>@{ghUser.login}</Text>
+                {ghUser.name && ghUser.name !== ghUser.login && (
+                  <Text style={styles.ghName}>{ghUser.name}</Text>
+                )}
+              </View>
+              <View style={[styles.ghConnectedBadge]}>
+                <Ionicons name="checkmark-circle" size={12} color={T.success} />
+                <Text style={styles.ghConnectedTxt}>Connecté</Text>
+              </View>
+            </View>
             <Text style={styles.ghDesc}>
-              Crée un token GitHub avec accès aux repos, puis colle-le ici.
+              Tous tes repos sont suivis. Les commits s'affichent dans l'onglet GitHub et le Calendrier.
             </Text>
-            <TouchableOpacity
-              style={styles.ghOpenBtn}
-              onPress={() => Linking.openURL('https://github.com/settings/tokens/new?scopes=repo&description=Kaban')}
-            >
-              <Ionicons name="open-outline" size={14} color="#58a6ff" />
-              <Text style={styles.ghOpenTxt}>Créer un token sur GitHub</Text>
-            </TouchableOpacity>
-            <Text style={styles.ghSectionLabel}>Token d'accès</Text>
-            <TextInput
-              style={styles.ghInput}
-              value={token}
-              onChangeText={t => { setToken(t); setError(''); }}
-              placeholder="ghp_xxxxxxxxxxxx"
-              placeholderTextColor={T.text3}
-              selectionColor={T.accent}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-            {!!error && <Text style={styles.ghError}>{error}</Text>}
-            <TouchableOpacity
-              style={[styles.ghSaveBtn, (!token.trim() || loading) && { opacity: 0.5 }]}
-              onPress={() => token.trim() && loadRepos(token.trim())}
-              disabled={!token.trim() || loading}
-            >
-              {loading
-                ? <ActivityIndicator color="#fff" size="small" />
-                : <Text style={styles.ghSaveTxt}>Connexion →</Text>
-              }
+            <TouchableOpacity style={styles.ghDisconnectBtn} onPress={onDisconnect}>
+              <Ionicons name="log-out-outline" size={15} color={T.error} />
+              <Text style={styles.ghDisconnectTxt}>Déconnecter le compte GitHub</Text>
             </TouchableOpacity>
           </>
+        ) : step === 'pending' && flow ? (
+          <>
+            <Text style={styles.ghDesc}>
+              Entre ce code sur GitHub pour autoriser Kaban :
+            </Text>
+            <TouchableOpacity
+              style={styles.ghCodeBox}
+              onPress={() => Linking.openURL('https://github.com/login/device')}
+            >
+              <Text style={styles.ghCode}>{flow.user_code}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.ghOpenBtn}
+              onPress={() => Linking.openURL('https://github.com/login/device')}
+            >
+              <Ionicons name="open-outline" size={14} color="#58a6ff" />
+              <Text style={styles.ghOpenTxt}>Ouvrir github.com/login/device</Text>
+            </TouchableOpacity>
+            <View style={styles.ghPollingRow}>
+              <ActivityIndicator color={T.accentSoft} size="small" />
+              <Text style={styles.ghPollingTxt}>En attente de l'autorisation…</Text>
+            </View>
+            {!!error && <Text style={styles.ghError}>{error}</Text>}
+            <TouchableOpacity onPress={() => { if (pollRef.current) clearInterval(pollRef.current); setStep('idle'); }} style={styles.ghCancelBtn}>
+              <Text style={styles.ghCancelTxt}>Annuler</Text>
+            </TouchableOpacity>
+          </>
+        ) : step === 'loading' ? (
+          <View style={styles.ghLoadingWrap}>
+            <ActivityIndicator color={T.accentSoft} size="large" />
+            <Text style={styles.ghLoadingTxt}>Chargement de tes repos…</Text>
+          </View>
         ) : (
           <>
-            <View style={styles.ghConnectedRow}>
-              <Ionicons name="checkmark-circle" size={14} color={T.success} />
-              <Text style={styles.ghConnectedTxt}>Connecté</Text>
-              <TouchableOpacity onPress={() => { setStep('token'); setAllRepos([]); }} style={{ marginLeft: 'auto' as any }}>
-                <Text style={styles.ghDisconnectTxt}>Déconnecter</Text>
-              </TouchableOpacity>
-            </View>
-
-            <TextInput
-              style={[styles.ghInput, { marginBottom: 8 }]}
-              value={search}
-              onChangeText={setSearch}
-              placeholder="Rechercher un repo…"
-              placeholderTextColor={T.text3}
-              selectionColor={T.accent}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-
-            {loading ? (
-              <ActivityIndicator color={T.accentSoft} style={{ marginVertical: 20 }} />
-            ) : (
-              <ScrollView style={{ maxHeight: 240 }} showsVerticalScrollIndicator={false}>
-                {filtered.length === 0 && <Text style={styles.ghEmpty}>Aucun repo trouvé.</Text>}
-                {filtered.map(r => {
-                  const key = `${r.owner}/${r.repo}`;
-                  const checked = selected.has(key);
-                  return (
-                    <TouchableOpacity key={key} style={styles.ghRepoRow} onPress={() => toggleRepo(key)}>
-                      <View style={[styles.ghCheckbox, checked && styles.ghCheckboxChecked]}>
-                        {checked && <Ionicons name="checkmark" size={11} color="#fff" />}
-                      </View>
-                      <Ionicons name={r.private ? 'lock-closed-outline' : 'git-branch-outline'} size={13} color={T.text3} />
-                      <Text style={styles.ghRepoName} numberOfLines={1}>{r.owner}/{r.repo}</Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
-            )}
-
-            <TouchableOpacity style={styles.ghSaveBtn} onPress={handleSave}>
-              <Text style={styles.ghSaveTxt}>Enregistrer ({selected.size} repo{selected.size > 1 ? 's' : ''})</Text>
+            <Text style={styles.ghDesc}>
+              Connecte ton compte GitHub pour voir tous tes commits dans l'app automatiquement.
+            </Text>
+            {!!error && <Text style={styles.ghError}>{error}</Text>}
+            <TouchableOpacity
+              style={[styles.ghSaveBtn, step === 'starting' && { opacity: 0.6 }]}
+              onPress={handleStartFlow}
+              disabled={step === 'starting'}
+            >
+              {step === 'starting'
+                ? <ActivityIndicator color="#fff" size="small" />
+                : <>
+                    <Ionicons name="logo-github" size={18} color="#fff" />
+                    <Text style={styles.ghSaveTxt}>Connexion avec GitHub</Text>
+                  </>
+              }
             </TouchableOpacity>
           </>
         )}
@@ -366,17 +353,22 @@ export default function TasksScreen({ all, onChange }: Props) {
     setRefreshing(false);
   }
 
-  function handleSaveRepos(newToken: string, newRepos: GitHubRepo[]) {
-    const updated = { ...all, githubToken: newToken, githubRepos: newRepos };
+  function handleAuth(token: string, user: { login: string; name: string }, newRepos: GitHubRepo[]) {
+    const updated = { ...all, githubToken: token, githubUser: user, githubRepos: newRepos };
     onChange(updated);
     saveAllProfiles(updated);
-    if (newRepos.length) {
-      fetchAllCommits(newRepos).then(newCommits => {
-        const withCommits = { ...updated, githubCommits: newCommits };
-        onChange(withCommits);
-        saveAllProfiles(withCommits);
-      });
-    }
+    fetchAllCommits(newRepos).then(newCommits => {
+      const withCommits = { ...updated, githubCommits: newCommits };
+      onChange(withCommits);
+      saveAllProfiles(withCommits);
+    });
+  }
+
+  function handleDisconnect() {
+    const updated = { ...all, githubToken: undefined, githubUser: undefined, githubRepos: [], githubCommits: [] };
+    onChange(updated);
+    saveAllProfiles(updated);
+    setGhModalVisible(false);
   }
 
   function handleSave(title: string, desc: string, assignedTo: string[], deadline?: string, priority?: TaskPriority) {
@@ -551,9 +543,9 @@ export default function TasksScreen({ all, onChange }: Props) {
 
       {ghModalVisible && (
         <GitHubModal
-          token={all.githubToken}
-          repos={repos}
-          onSave={handleSaveRepos}
+          ghUser={all.githubUser}
+          onAuth={handleAuth}
+          onDisconnect={handleDisconnect}
           onClose={() => setGhModalVisible(false)}
           onRefresh={() => { setGhModalVisible(false); handleRefreshCommits(); }}
         />
@@ -661,20 +653,32 @@ const styles = StyleSheet.create({
   ghTitle:        { fontSize: 17, fontWeight: '800', color: T.text, flex: 1 },
   ghRefreshBtn:   { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: T.accentDim, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 5 },
   ghRefreshTxt:   { fontSize: 12, color: T.accentSoft, fontWeight: '700' },
-  ghDesc:         { fontSize: 13, color: T.text2, lineHeight: 19, marginBottom: 12 },
-  ghOpenBtn:      { flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: '#161b22', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 9, borderWidth: 1, borderColor: '#30363d', marginBottom: 4, alignSelf: 'flex-start' as any },
-  ghOpenTxt:      { fontSize: 13, color: '#58a6ff', fontWeight: '600' },
-  ghEmpty:        { fontSize: 13, color: T.text3, textAlign: 'center', paddingVertical: 12 },
-  ghRepoRow:      { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 10, padding: 10, marginBottom: 4 },
-  ghRepoName:     { fontSize: 13, color: T.text, fontWeight: '500', flex: 1 },
-  ghCheckbox:     { width: 20, height: 20, borderRadius: 6, borderWidth: 1.5, borderColor: T.border, backgroundColor: T.cardAlt, alignItems: 'center', justifyContent: 'center' },
+  ghDesc:          { fontSize: 13, color: T.text2, lineHeight: 19, marginBottom: 14 },
+  ghProfileRow:    { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#161b22', borderRadius: 14, padding: 14, marginBottom: 14, borderWidth: 1, borderColor: '#30363d' },
+  ghAvatar:        { width: 44, height: 44, borderRadius: 22, backgroundColor: '#30363d', alignItems: 'center', justifyContent: 'center' },
+  ghLogin:         { fontSize: 15, fontWeight: '800', color: T.text },
+  ghName:          { fontSize: 12, color: T.text3, marginTop: 2 },
+  ghConnectedBadge:{ flexDirection: 'row', alignItems: 'center', gap: 4, marginLeft: 'auto' as any },
+  ghConnectedTxt:  { fontSize: 11, color: T.success, fontWeight: '700' },
+  ghDisconnectBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 12, paddingVertical: 12, justifyContent: 'center', borderWidth: 1, borderColor: T.error + '44', marginTop: 8 },
+  ghDisconnectTxt: { fontSize: 13, color: T.error, fontWeight: '700' },
+  ghCodeBox:       { backgroundColor: '#161b22', borderRadius: 14, paddingVertical: 18, alignItems: 'center', borderWidth: 1, borderColor: '#30363d', marginBottom: 12 },
+  ghCode:          { fontSize: 32, fontWeight: '900', color: '#f0f6fc', letterSpacing: 6 },
+  ghOpenBtn:       { flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: '#161b22', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 9, borderWidth: 1, borderColor: '#30363d', marginBottom: 14, alignSelf: 'flex-start' as any },
+  ghOpenTxt:       { fontSize: 13, color: '#58a6ff', fontWeight: '600' },
+  ghPollingRow:    { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 },
+  ghPollingTxt:    { fontSize: 13, color: T.text2 },
+  ghCancelBtn:     { alignItems: 'center', paddingVertical: 10 },
+  ghCancelTxt:     { fontSize: 13, color: T.text3, fontWeight: '600' },
+  ghLoadingWrap:   { alignItems: 'center', paddingVertical: 30, gap: 14 },
+  ghLoadingTxt:    { fontSize: 14, color: T.text2 },
+  ghEmpty:         { fontSize: 13, color: T.text3, textAlign: 'center', paddingVertical: 12 },
+  ghRepoRow:       { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 10, padding: 10, marginBottom: 4 },
+  ghRepoName:      { fontSize: 13, color: T.text, fontWeight: '500', flex: 1 },
+  ghCheckbox:      { width: 20, height: 20, borderRadius: 6, borderWidth: 1.5, borderColor: T.border, backgroundColor: T.cardAlt, alignItems: 'center', justifyContent: 'center' },
   ghCheckboxChecked: { backgroundColor: T.accent, borderColor: T.accent },
-  ghConnectedRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
-  ghConnectedTxt: { fontSize: 13, color: T.success, fontWeight: '600' },
-  ghDisconnectTxt:{ fontSize: 12, color: T.error, fontWeight: '600' },
-  ghSectionLabel: { fontSize: 11, color: T.text2, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase', marginTop: 14, marginBottom: 8 },
-  ghInput:        { backgroundColor: T.input, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11, color: T.text, fontSize: 14, borderWidth: 1, borderColor: T.border, marginBottom: 4 },
-  ghError:        { color: T.error, fontSize: 12, fontWeight: '600', marginTop: 4, marginBottom: 4 },
-  ghSaveBtn:      { backgroundColor: T.accent, borderRadius: 14, paddingVertical: 14, alignItems: 'center', marginTop: 14 },
-  ghSaveTxt:      { color: '#fff', fontWeight: '800', fontSize: 15 },
+  ghInput:         { backgroundColor: T.input, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11, color: T.text, fontSize: 14, borderWidth: 1, borderColor: T.border, marginBottom: 4 },
+  ghError:         { color: T.error, fontSize: 12, fontWeight: '600', marginTop: 4, marginBottom: 4 },
+  ghSaveBtn:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: '#24292f', borderRadius: 14, paddingVertical: 15, marginTop: 6, borderWidth: 1, borderColor: '#30363d' },
+  ghSaveTxt:       { color: '#f0f6fc', fontWeight: '800', fontSize: 15 },
 });

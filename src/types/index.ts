@@ -63,6 +63,7 @@ export interface AllProfiles {
   laboSessions?: LaboSession[];
   groupTasks?: GroupTask[];
   githubToken?: string;
+  githubUser?: { login: string; name: string };
   githubRepos?: GitHubRepo[];
   githubCommits?: GitHubCommit[];
 }
