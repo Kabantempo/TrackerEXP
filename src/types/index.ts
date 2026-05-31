@@ -11,6 +11,12 @@ export interface Profile {
 export type TaskStatus   = 'todo' | 'done';
 export type TaskPriority = 'high' | 'medium' | 'low';
 
+export interface Subtask {
+  id: string;
+  title: string;
+  done: boolean;
+}
+
 export interface TaskComment {
   id: string;
   profileId: string;
@@ -28,6 +34,7 @@ export interface GroupTask {
   status: TaskStatus;
   priority?: TaskPriority;
   comments?: TaskComment[];
+  subtasks?: Subtask[];
   createdAt: string;
 }
 

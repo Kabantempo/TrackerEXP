@@ -4,7 +4,7 @@ import {
   TextInput, ScrollView, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Profile, GroupTask, HABIT_COLORS, TaskPriority } from '../types';
+import { Profile, GroupTask, Subtask, HABIT_COLORS, TaskPriority } from '../types';
 import { T } from '../theme';
 
 const AVATAR_COLORS = HABIT_COLORS;
@@ -38,18 +38,20 @@ interface Props {
   profiles: Profile[];
   activeId: string;
   task?: GroupTask;
-  onSave: (title: string, description: string, assignedTo: string[], deadline?: string, priority?: TaskPriority) => void;
+  onSave: (title: string, description: string, assignedTo: string[], deadline?: string, priority?: TaskPriority, subtasks?: Subtask[]) => void;
   onClose: () => void;
 }
 
 export default function TaskModal({ visible, profiles, activeId, task, onSave, onClose }: Props) {
-  const [title,       setTitle]       = useState('');
-  const [description, setDescription] = useState('');
-  const [assignedTo,  setAssignedTo]  = useState<string[]>([activeId]);
-  const [priority,    setPriority]    = useState<TaskPriority>('medium');
-  const [dateRaw,     setDateRaw]     = useState('');
-  const [dateError,   setDateError]   = useState(false);
-  const [error,       setError]       = useState('');
+  const [title,        setTitle]        = useState('');
+  const [description,  setDescription]  = useState('');
+  const [assignedTo,   setAssignedTo]   = useState<string[]>([activeId]);
+  const [priority,     setPriority]     = useState<TaskPriority>('medium');
+  const [dateRaw,      setDateRaw]      = useState('');
+  const [dateError,    setDateError]    = useState(false);
+  const [error,        setError]        = useState('');
+  const [subtasks,     setSubtasks]     = useState<Subtask[]>([]);
+  const [subtaskInput, setSubtaskInput] = useState('');
 
   useEffect(() => {
     if (task) {
@@ -58,12 +60,25 @@ export default function TaskModal({ visible, profiles, activeId, task, onSave, o
       setAssignedTo(Array.isArray(task.assignedTo) ? task.assignedTo : [task.assignedTo]);
       setPriority(task.priority ?? 'medium');
       setDateRaw(isoToDisplay(task.deadline));
+      setSubtasks(task.subtasks ?? []);
     } else {
       setTitle(''); setDescription('');
       setAssignedTo([activeId]); setPriority('medium'); setDateRaw('');
+      setSubtasks([]);
     }
-    setError(''); setDateError(false);
+    setError(''); setDateError(false); setSubtaskInput('');
   }, [task, visible, activeId]);
+
+  function addSubtask() {
+    const t = subtaskInput.trim();
+    if (!t) return;
+    setSubtasks(prev => [...prev, { id: Date.now().toString(), title: t, done: false }]);
+    setSubtaskInput('');
+  }
+
+  function removeSubtask(id: string) {
+    setSubtasks(prev => prev.filter(s => s.id !== id));
+  }
 
   function toggleAssign(id: string) {
     setAssignedTo(prev =>
@@ -79,7 +94,7 @@ export default function TaskModal({ visible, profiles, activeId, task, onSave, o
       deadline = parseDate(dateRaw);
       if (!deadline) { setDateError(true); setError('Date invalide (format JJ/MM/AAAA).'); return; }
     }
-    onSave(title.trim(), description.trim(), assignedTo, deadline, priority);
+    onSave(title.trim(), description.trim(), assignedTo, deadline, priority, subtasks);
     onClose();
   }
 
@@ -177,6 +192,35 @@ export default function TaskModal({ visible, profiles, activeId, task, onSave, o
             </View>
             {dateError && <Text style={styles.fieldError}>Format attendu : JJ/MM/AAAA</Text>}
 
+            {/* Sous-tâches */}
+            <Text style={styles.label}>
+              Sous-tâches <Text style={styles.optional}>(optionnel)</Text>
+            </Text>
+            <View style={styles.subtaskInputRow}>
+              <TextInput
+                style={styles.subtaskInput}
+                value={subtaskInput}
+                onChangeText={setSubtaskInput}
+                placeholder="Ajouter une sous-tâche…"
+                placeholderTextColor={T.text3}
+                selectionColor={T.accent}
+                onSubmitEditing={addSubtask}
+                returnKeyType="done"
+              />
+              <TouchableOpacity style={styles.subtaskAddBtn} onPress={addSubtask}>
+                <Ionicons name="add" size={18} color="#fff" />
+              </TouchableOpacity>
+            </View>
+            {subtasks.map(s => (
+              <View key={s.id} style={styles.subtaskRow}>
+                <Ionicons name="ellipse-outline" size={14} color={T.text3} />
+                <Text style={styles.subtaskRowTitle} numberOfLines={1}>{s.title}</Text>
+                <TouchableOpacity onPress={() => removeSubtask(s.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <Ionicons name="close-circle-outline" size={16} color={T.error} />
+                </TouchableOpacity>
+              </View>
+            ))}
+
             {!!error && <Text style={styles.errorText}>{error}</Text>}
 
             {/* Boutons */}
@@ -246,4 +290,20 @@ const styles = StyleSheet.create({
   priorityRow: { flexDirection: 'row', gap: 8 },
   priorityBtn: { flex: 1, paddingVertical: 9, borderRadius: 10, borderWidth: 1.5, borderColor: T.border, backgroundColor: T.input, alignItems: 'center' },
   priorityTxt: { fontSize: 12, fontWeight: '700', color: T.text2 },
+
+  subtaskInputRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
+  subtaskInput: {
+    flex: 1, backgroundColor: T.input, borderRadius: 12, paddingHorizontal: 14,
+    paddingVertical: 11, color: T.text, fontSize: 14,
+    borderWidth: 1, borderColor: T.border,
+  },
+  subtaskAddBtn: {
+    width: 40, height: 40, borderRadius: 12, backgroundColor: T.accent,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  subtaskRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: T.border,
+  },
+  subtaskRowTitle: { flex: 1, fontSize: 13, color: T.text2 },
 });

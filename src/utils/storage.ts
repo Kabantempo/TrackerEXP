@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { AppData, AllProfiles, Profile, Habit, DailyEntry, LaboSession, GroupTask, TaskStatus, TaskPriority, TaskComment, getTodayKey, isChallengeActive, checkBadges, timeToMinutes } from '../types';
+import { AppData, AllProfiles, Profile, Habit, DailyEntry, LaboSession, GroupTask, TaskStatus, TaskPriority, TaskComment, Subtask, getTodayKey, isChallengeActive, checkBadges, timeToMinutes } from '../types';
 import { supabase, getTeamId } from './supabase';
 
 const PROFILES_KEY = 'kaban_profiles_v1';
@@ -204,12 +204,12 @@ export function deleteLaboSession(all: AllProfiles, id: string): AllProfiles {
 
 export function addGroupTask(
   all: AllProfiles, assignedBy: string, assignedTo: string[],
-  title: string, description: string, deadline?: string, priority?: TaskPriority,
+  title: string, description: string, deadline?: string, priority?: TaskPriority, subtasks?: Subtask[],
 ): AllProfiles {
   const task: GroupTask = {
     id: Date.now().toString(), title: title.trim(), description: description.trim(),
     assignedBy, assignedTo, deadline, priority: priority ?? 'medium',
-    status: 'todo', comments: [], createdAt: getTodayKey(),
+    status: 'todo', comments: [], subtasks: subtasks ?? [], createdAt: getTodayKey(),
   };
   return { ...all, groupTasks: [...(all.groupTasks ?? []), task] };
 }
@@ -239,12 +239,23 @@ export function deleteGroupTask(all: AllProfiles, id: string): AllProfiles {
 
 export function editGroupTask(
   all: AllProfiles, id: string,
-  title: string, description: string, assignedTo: string[], deadline?: string, priority?: TaskPriority,
+  title: string, description: string, assignedTo: string[], deadline?: string, priority?: TaskPriority, subtasks?: Subtask[],
 ): AllProfiles {
   return {
     ...all,
     groupTasks: (all.groupTasks ?? []).map(t =>
-      t.id === id ? { ...t, title: title.trim(), description: description.trim(), assignedTo, deadline, priority: priority ?? t.priority } : t
+      t.id === id ? { ...t, title: title.trim(), description: description.trim(), assignedTo, deadline, priority: priority ?? t.priority, subtasks: subtasks ?? t.subtasks } : t
+    ),
+  };
+}
+
+export function toggleSubtask(all: AllProfiles, taskId: string, subtaskId: string): AllProfiles {
+  return {
+    ...all,
+    groupTasks: (all.groupTasks ?? []).map(t =>
+      t.id === taskId
+        ? { ...t, subtasks: (t.subtasks ?? []).map(s => s.id === subtaskId ? { ...s, done: !s.done } : s) }
+        : t
     ),
   };
 }

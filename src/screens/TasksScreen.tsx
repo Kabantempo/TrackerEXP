@@ -5,9 +5,9 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { AllProfiles, Profile, GroupTask, TaskPriority, GitHubRepo, GitHubCommit, HABIT_COLORS, getTodayKey } from '../types';
+import { AllProfiles, Profile, GroupTask, TaskPriority, Subtask, GitHubRepo, GitHubCommit, HABIT_COLORS, getTodayKey } from '../types';
 import {
-  addGroupTask, toggleGroupTask, deleteGroupTask, editGroupTask, addTaskComment, saveAllProfiles,
+  addGroupTask, toggleGroupTask, deleteGroupTask, editGroupTask, toggleSubtask, addTaskComment, saveAllProfiles,
 } from '../utils/storage';
 import { fetchAllCommits, fetchAllNpmPackageNames, startDeviceFlow, pollDeviceFlow, fetchGitHubUser, fetchUserRepos, DeviceFlowData } from '../utils/github';
 import { sendTaskAssignedNotif } from '../utils/notifications';
@@ -215,7 +215,7 @@ interface Props { all: AllProfiles; onChange: (all: AllProfiles) => void }
 
 function TaskCard({
   task, profiles, activeId,
-  onToggle, onEdit, onDelete,
+  onToggle, onEdit, onDelete, onToggleSubtask,
 }: {
   task: GroupTask;
   profiles: Profile[];
@@ -223,6 +223,7 @@ function TaskCard({
   onToggle: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  onToggleSubtask: (subtaskId: string) => void;
 }) {
   const assignedIds = Array.isArray(task.assignedTo) ? task.assignedTo : [task.assignedTo];
   const assignees = profiles.filter(p => assignedIds.includes(p.id));
@@ -277,6 +278,27 @@ function TaskCard({
           <Text style={[styles.cardDesc, done && { opacity: 0.4 }]} numberOfLines={2}>
             {task.description}
           </Text>
+        )}
+
+        {/* Sous-tâches */}
+        {(task.subtasks ?? []).length > 0 && (
+          <View style={styles.subtaskList}>
+            {(task.subtasks ?? []).map(s => (
+              <TouchableOpacity
+                key={s.id}
+                style={styles.subtaskItem}
+                onPress={() => onToggleSubtask(s.id)}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.subtaskCheck, s.done && { backgroundColor: T.success, borderColor: T.success }]}>
+                  {s.done && <Ionicons name="checkmark" size={9} color="#fff" />}
+                </View>
+                <Text style={[styles.subtaskLabel, s.done && styles.subtaskLabelDone]} numberOfLines={1}>
+                  {s.title}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
         )}
 
         {/* Footer : assigné + deadline */}
@@ -381,12 +403,12 @@ export default function TasksScreen({ all, onChange }: Props) {
     setGhModalVisible(false);
   }
 
-  function handleSave(title: string, desc: string, assignedTo: string[], deadline?: string, priority?: TaskPriority) {
+  function handleSave(title: string, desc: string, assignedTo: string[], deadline?: string, priority?: TaskPriority, subtasks?: Subtask[]) {
     let updated: AllProfiles;
     if (editingTask) {
-      updated = editGroupTask(all, editingTask.id, title, desc, assignedTo, deadline, priority);
+      updated = editGroupTask(all, editingTask.id, title, desc, assignedTo, deadline, priority, subtasks);
     } else {
-      updated = addGroupTask(all, activeId, assignedTo, title, desc, deadline, priority);
+      updated = addGroupTask(all, activeId, assignedTo, title, desc, deadline, priority, subtasks);
       const others = assignedTo.filter(id => id !== activeId);
       if (others.length > 0) {
         const creator = all.profiles.find(p => p.id === activeId);
@@ -396,6 +418,11 @@ export default function TasksScreen({ all, onChange }: Props) {
     }
     onChange(updated); saveAllProfiles(updated);
     setEditingTask(undefined);
+  }
+
+  function handleToggleSubtask(task: GroupTask, subtaskId: string) {
+    const updated = toggleSubtask(all, task.id, subtaskId);
+    onChange(updated); saveAllProfiles(updated);
   }
 
   function handleToggle(task: GroupTask) {
@@ -528,6 +555,7 @@ export default function TasksScreen({ all, onChange }: Props) {
                   onToggle={() => handleToggle(item)}
                   onEdit={() => { setEditingTask(item); setModalVisible(true); }}
                   onDelete={() => handleDelete(item)}
+                  onToggleSubtask={(sid) => handleToggleSubtask(item, sid)}
                 />
               </>
             );
@@ -621,6 +649,12 @@ const styles = StyleSheet.create({
   actionBtn:      { padding: 4 },
 
   cardDesc: { fontSize: 12, color: T.text2, lineHeight: 17, marginBottom: 8 },
+
+  subtaskList:      { marginBottom: 8, gap: 4 },
+  subtaskItem:      { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 3 },
+  subtaskCheck:     { width: 16, height: 16, borderRadius: 4, borderWidth: 1.5, borderColor: T.border, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  subtaskLabel:     { fontSize: 12, color: T.text2, flex: 1 },
+  subtaskLabelDone: { textDecorationLine: 'line-through', opacity: 0.45 },
 
   cardFooter:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   cardAssignee:   { flexDirection: 'row', alignItems: 'center', gap: 6 },
