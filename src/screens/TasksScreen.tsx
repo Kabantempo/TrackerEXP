@@ -152,7 +152,6 @@ function GitHubModal({ token: initialToken, repos: initialRepos, onSave, onClose
               selectionColor={T.accent}
               autoCapitalize="none"
               autoCorrect={false}
-              secureTextEntry
             />
             {!!error && <Text style={styles.ghError}>{error}</Text>}
             <TouchableOpacity
