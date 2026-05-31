@@ -77,6 +77,7 @@ function GitHubModal({ ghUser, onAuth, onDisconnect, onClose, onRefresh }: {
       const data = await startDeviceFlow();
       setFlow(data);
       setStep('pending');
+      Linking.openURL('https://github.com/login/device');
       pollRef.current = setInterval(async () => {
         try {
           const token = await pollDeviceFlow(data.device_code);
@@ -97,8 +98,13 @@ function GitHubModal({ ghUser, onAuth, onDisconnect, onClose, onRefresh }: {
           setStep('idle');
         }
       }, (data.interval ?? 5) * 1000);
-    } catch {
-      setError('Erreur de connexion à GitHub.');
+    } catch (e: any) {
+      const msg = e?.message ?? '';
+      if (msg.includes('device_flow') || msg.includes('not_enabled')) {
+        setError('Active "Device Flow" dans ton OAuth App GitHub (Settings → Developer settings → OAuth Apps → ton app → Enable Device Flow).');
+      } else {
+        setError(`Erreur : ${msg || 'connexion impossible'}`);
+      }
       setStep('idle');
     }
   }

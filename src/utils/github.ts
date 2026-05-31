@@ -21,8 +21,10 @@ export async function startDeviceFlow(): Promise<DeviceFlowData> {
     headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
     body: JSON.stringify({ client_id: CLIENT_ID, scope: 'repo read:user' }),
   });
-  if (!res.ok) throw new Error('device_flow_failed');
-  return res.json();
+  const data = await res.json();
+  if (data.error) throw new Error(data.error_description ?? data.error);
+  if (!data.device_code) throw new Error('device_flow_failed');
+  return data;
 }
 
 export async function pollDeviceFlow(deviceCode: string): Promise<string | null> {
